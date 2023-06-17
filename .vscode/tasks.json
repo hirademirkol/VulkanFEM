@@ -3,16 +3,55 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"label": "CMake: Build Debug",
+			"label": "Build Debug",
 			"command": "cmake --build ${workspaceFolder}/build --config Debug",
 			"group": "build",
-			"detail": "CMake template build task"
+			"icon": {
+				"id": "debug"
+			}
 		},
 		{
 			"type": "shell",
-			"label": "CMake: Build Release",
+			"label": "Build Release",
 			"command": "cmake --build ${workspaceFolder}/build --config Release",
 			"group": "build",
+			"icon": {
+				"id": "package"
+			}
+		},
+		{
+			"type": "shell",
+			"label": "Build Debug (CPU)",
+			"command": "cmake --build ${workspaceFolder}/build --config Debug",
+			"group": "build",
+			"icon": {
+				"id": "debug"
+			}
+		},
+		{
+			"type": "shell",
+			"label": "Build Release (CPU)",
+			"command": "cmake --build ${workspaceFolder}/build --config Release -DCMAKE_CXX_FLAGS:='/CPU=1'",
+			"group": "build",
+			"icon": {
+				"id": "package"
+			}
+		},
+		{
+			"type": "cmake",
+			"label": "CMake: Build",
+			"command": "build",
+			"targets": [
+				"ALL_BUILD"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"icon": {
+				"id": "gear"
+			},
+			"problemMatcher": [],
 			"detail": "CMake template build task"
 		}
 	]

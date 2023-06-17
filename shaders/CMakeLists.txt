@@ -6,13 +6,17 @@ vulkan_compile_shader(INFILE matxVec.comp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
-vulkan_compile_shader(INFILE vecxVec.comp
-    OUTFILE VecxVec.hpp
+vulkan_compile_shader(INFILE gaussSeidel.comp
+    OUTFILE GaussSeidel.hpp
+    NAMESPACE "shaders"
+    RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
+
+vulkan_compile_shader(INFILE conjugateGradient.comp
+    OUTFILE CG.hpp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
 # Then add it to the library, so you can access it later in your code
-add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp")
-add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/VecxVec.hpp")
+add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp" "${CMAKE_CURRENT_BINARY_DIR}/GaussSeidel.hpp" "${CMAKE_CURRENT_BINARY_DIR}/CG.hpp")
 
 target_include_directories(shaders INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
