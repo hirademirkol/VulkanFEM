@@ -2,21 +2,22 @@
 
 #extension GL_EXT_shader_atomic_float: enable
 
-layout (constant_id = 0) const int n = 0;
-layout (constant_id = 1) const int m = 0;
+layout (constant_id = 0) const int numDoF = 0;
+layout (constant_id = 1) const int numIndices = 0;
 
 // The execution structure
 layout (local_size_x = 1) in;
 
 // The buffers are provided via the tensors
-layout(binding = 0) buffer bufA { float a[]; };
-layout(binding = 1) buffer bufB { float b[]; };
-layout(binding = 2) buffer bufOut { float o[]; };
+layout(binding = 0) buffer bufIndices { uint indices[]; };
+layout(binding = 1) buffer bufValues { double values[]; };
+layout(binding = 2) buffer bufp { double p[]; };
+layout(binding = 3) buffer bufap { double ap[]; };
 
 void main() {
-    const uint index = gl_GlobalInvocationID.x;
-    const uint row = index / m;
-    const uint col = index % m;
-
-    atomicAdd(o[row], a[index] * b[col]);
+    const uint index = indices[gl_GlobalInvocationID.x];
+    const uint i = index / numDoF;
+    const uint j = index % numDoF;
+    ap[i] = 1;
+    atomicAdd(ap[i], values[gl_GlobalInvocationID.x] * p[j]);
 }
