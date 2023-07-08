@@ -3,11 +3,13 @@
 #include <utility>
 #include <map>
 #include <unordered_map>
+#include <array>
 
 #include <math.h>
 
 #define MAX_ITER 10
 #define index(i,j,n) (i)*(n)+(j)
+#define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 
 template <typename scalar> 
 struct Mat{
@@ -75,7 +77,11 @@ inline bool stationary(Vec3i element)
 }
 
 template<typename scalar>
+#ifdef CSPARSE
+cs* assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24])
+#else
 Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24])
+#endif
 {
 	Vec3i vertexGridDimensions = voxelGridDimensions + Vec3i(1);
 
@@ -125,11 +131,17 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 		elementToGlobal.push_back(verts);
 	}
 
-	saveMatrix<uint64_t, 8>(elementToGlobal);
+	// saveMatrix<uint64_t, 8>(elementToGlobal);
 
 	int size = usedVertices.size() * 3;
 
+#ifdef CSPARSE
+	cs* systemMatrix = new cs();
+	systemMatrix->m = size;
+	systemMatrix->n = size;
+#else
 	Mat<scalar> systemMatrix(size);
+#endif
 	for(auto line : elementToGlobal)
 	{
 		FOR3(vert, Vec3i(0), Vec3i(2))
@@ -143,24 +155,34 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 				auto iGlobal = line[i];
 				auto jGlobal = line[j];
 
+				if(iGlobal == 10412 && jGlobal == 10418)
+				{
+					std::cout << elementStiffness[i*3 + 2][j*3] << std::endl;
+				}
+
 				for(int c1 = 0; c1 < 3; c1++)
 				{
 					for(int c2 = 0; c2 < 3; c2++)
 					{
-						systemMatrix[index(iGlobal*3 + c1, jGlobal*3 + c2, size)] += elementStiffness[i*3 + c1][j*3 + c2];
+#ifdef CSPARSE
+						cs_entry(systemMatrix, iGlobal, jGlobal, get_symmetric(elementStiffness,i*3 + c1,j*3 + c2));
+#else
+						systemMatrix[index(iGlobal*3 + c1, jGlobal*3 + c2, size)] += get_symmetric(elementStiffness,i*3 + c1,j*3 + c2);
+#endif
 					}
 				}
 			}
 		}
 	}
 
+#ifdef CSPARSE
+	cs_dupl(systemMatrix);
+	std::cout << "System Matrix : Size:" << size << "x" << size << ", Non-Zero:" << systemMatrix->nz << ", " << ((float)systemMatrix->nz/size) << " full per row" << std::endl;
+#else
 	std::cout << "System Matrix : Size:" << size << "x" << size << ", Non-Zero:" << systemMatrix.data.size() << ", " << ((float)systemMatrix.data.size()/size) << " full per row" << std::endl;
-
+#endif
 	return systemMatrix;
 }
-
-// template Matd assembleSystemMatrix<double>(int* &voxelModel, Vec3i dimensions, double elementStiffness[24][24]);
-// template Matf assembleSystemMatrix<float>(int* &voxelModel, Vec3i dimensions, float elementStiffness[24][24]);
 
 template <typename scalar>
 std::vector<scalar> multiply(const Mat<scalar>& A, const std::vector<scalar>& b)
