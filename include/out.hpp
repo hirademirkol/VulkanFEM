@@ -106,6 +106,25 @@ void saveMatrix(std::vector<std::vector<T>> data, std::string name = "matrix")
 	myfile.close();
 }
 
+template <typename T>
+void saveVector(std::vector<T> data, std::string name = "vector")
+{
+	std::filesystem::path path = std::filesystem::current_path();
+    std::filesystem::path file_path = "\\..\\data\\" + name + ".csv";
+	path += file_path;
+    
+    std::ofstream myfile (path.string());
+
+	int n = data.size();
+	for (int j = 0; j < n; j++)
+	{
+		myfile << "," << data[j];
+	}
+	myfile << std::endl;
+	
+	myfile.close();
+}
+
 template <typename T, size_t l>
 void saveMatrix(std::vector<std::array<T,l>> data, std::string name = "matrix")
 {

@@ -7,7 +7,12 @@
 
 #include <math.h>
 
-#define MAX_ITER 10
+// #define CSPARSE
+#ifdef CSPARSE
+#include <cs.h>
+#endif
+
+#define MAX_ITER 20
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 
@@ -155,11 +160,6 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 				auto iGlobal = line[i];
 				auto jGlobal = line[j];
 
-				if(iGlobal == 10412 && jGlobal == 10418)
-				{
-					std::cout << elementStiffness[i*3 + 2][j*3] << std::endl;
-				}
-
 				for(int c1 = 0; c1 < 3; c1++)
 				{
 					for(int c2 = 0; c2 < 3; c2++)
@@ -183,6 +183,24 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 #endif
 	return systemMatrix;
 }
+
+template <typename scalar>
+void applyBoundaryConditions(Mat<scalar>& systemMatrix, std::vector<scalar> f, const std::vector<uint64_t>& fixedNodes)
+{
+	
+	for(auto iter = fixedNodes.cend()-1; iter > fixedNodes.cbegin(); iter--)
+	{
+		// f.erase(*iter);
+
+		for(auto node : fixedNodes)
+		{
+			systemMatrix.data.erase(index(*iter, node, systemMatrix.rows));
+		}
+	}
+}
+
+template void applyBoundaryConditions<double>(Matd& systemMatrix, std::vector<double> f, const std::vector<uint64_t>& fixedNodes);
+template void applyBoundaryConditions<float>(Matf& systemMatrix, std::vector<float> f, const std::vector<uint64_t>& fixedNodes);
 
 template <typename scalar>
 std::vector<scalar> multiply(const Mat<scalar>& A, const std::vector<scalar>& b)
@@ -286,7 +304,21 @@ scalar two_norm(const std::vector<scalar>& b)
 }
 
 template <typename scalar>
-void solveWithCG(const Mat<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
+void smoothWithJacobi(const Mat<scalar>& A, const std::vector<scalar>& r, std::vector<scalar>& x)
+{
+	for(int i = 0; i < x.size(); i++)
+	{
+		auto val = A[index(i,i,A.rows)];
+		if(val != 0.0)
+			x[i] += (scalar)0.4 * r[i] / val;
+	}
+}
+
+template void smoothWithJacobi<double>(const Mat<double>& A, const std::vector<double>& b, std::vector<double>& x);
+template void smoothWithJacobi<float>(const Mat<float>& A, const std::vector<float>& b, std::vector<float>& x);
+
+template <typename scalar>
+void solveWithCG(const Mat<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x, const std::vector<uint64_t> &fixedNodes)
 {
 	uint64_t size = x.size();
 	std::vector<scalar> r(b);
@@ -294,30 +326,42 @@ void solveWithCG(const Mat<scalar>& A, const std::vector<scalar>& b, std::vector
 
 	scalar lambda = (scalar)0;
 	subtract(r, multiply(A, x));
+
+	// smoothWithJacobi(A, r, x);
 	std::vector<scalar> p(r);
+
+	// subtract(r, multiply(A, x));
 
 	for(int i = 0; i < MAX_ITER; i++)
 	{
 		scalar n1 = multiplyTranspose(r,r);
 		lambda = n1 / multiplyTranspose(p, multiply(A, p));
 
-		// lambda *= (scalar)0.5;
-
+		// lambda *= (scalar)0.01;
 		add(x, multiply(lambda, p));
 
 		subtract(r, multiply(lambda, multiply(A, p)));
 		r2 = r;
 		
+		for(int i = 0; i < r.size(); i++)
+		{
+			auto val = A[index(i,i,A.rows)];
+			if(val != 0.0)
+				r[i] += r[i] / val;
+		}
+
 		scalar n2 = multiplyTranspose(r2, r2);
 
 		add(r2, multiply(n2/n1, p));
 		p = r2;
 
 		r.swap(r2);
+		// smoothWithJacobi(A, r, x);
+		// subtract(r, multiply(A, x));
 
 		std::cout << "iteration: " << i << ", " << "Norm: " << two_norm(r2) << std::endl;
 	}
 }
 
-template void solveWithCG<double>(const Matd& A, const std::vector<double>& b, std::vector<double>& x);
-template void solveWithCG<float>(const Matf& A, const std::vector<float>& b, std::vector<float>& x);
+template void solveWithCG<double>(const Matd& A, const std::vector<double>& b, std::vector<double>& x, const std::vector<uint64_t> &fixedNodes);
+template void solveWithCG<float>(const Matf& A, const std::vector<float>& b, std::vector<float>& x, const std::vector<uint64_t> &fixedNodes);
