@@ -3,20 +3,23 @@ project(Master)
 
 set(CMAKE_CXX_STANDARD 20)
 
-message("Applying patches for kompute")
+# message("Applying patches for kompute")
 
-file(GLOB PATCHES "${CMAKE_SOURCE_DIR}/patches/*.patch")
-foreach(patch_file ${PATCHES})
-    execute_process(COMMAND ${GIT_EXECUTABLE} apply --3way --whitespace=nowarn ${patch_file}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/external/kompute)
-endforeach(patch_file ${PATCHES})
+# file(GLOB PATCHES "${CMAKE_SOURCE_DIR}/patches/*.patch")
+# foreach(patch_file ${PATCHES})
+#     execute_process(COMMAND ${GIT_EXECUTABLE} apply --3way --whitespace=nowarn ${patch_file}
+#     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/external/kompute)
+# endforeach(patch_file ${PATCHES})
 
-add_subdirectory(external/kompute ${CMAKE_CURRENT_BINARY_DIR}/kompute_build)
-list(APPEND CMAKE_PREFIX_PATH "${kompute_SOURCE_DIR}/cmake")
-include_directories(external/kompute/src/include ${CMAKE_SOURCE_DIR}/include)
+# add_subdirectory(external/kompute ${CMAKE_CURRENT_BINARY_DIR}/kompute_build)
+# list(APPEND CMAKE_PREFIX_PATH "${kompute_SOURCE_DIR}/cmake")
+# include_directories(external/kompute/src/include)
 
-add_subdirectory(external/SuiteSparse/CSparse)
-include_directories(external/SuiteSparse/CSparse/Include)
+# add_subdirectory(external/SuiteSparse/CSparse)
+# include_directories(external/SuiteSparse/CSparse/Include)
+
+add_subdirectory(external/eigen)
+include_directories(external/eigen)
 # set( CXSparse_ROOT "${CMAKE_SOURCE_DIR}/external/SuiteSparse/CXSparse")
 
 # set ( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -31,5 +34,6 @@ include_directories(external/SuiteSparse/CSparse/Include)
 # set(SUITESPARSE_CONFIG_LIBRARY "${CMAKE_SOURCE_DIR}/external/SuiteSparse/SuiteSparse_config/build")
 # add_subdirectory(external/SuiteSparse/CXSparse)
 
+include_directories(${CMAKE_SOURCE_DIR}/include)
 add_subdirectory(src)
-add_subdirectory(shaders)
+# add_subdirectory(shaders)

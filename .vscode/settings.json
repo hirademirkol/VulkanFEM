@@ -110,7 +110,14 @@
         "numeric": "cpp",
         "scoped_allocator": "cpp",
         "shared_mutex": "cpp",
-        "strstream": "cpp"
+        "strstream": "cpp",
+        "cs.h": "c",
+        "sparse": "cpp",
+        "orderingmethods": "cpp",
+        "sparseqr": "cpp",
+        "iterativelinearsolvers": "cpp",
+        "nonlinearoptimization": "cpp",
+        "*.traits": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cmake.generator": "Visual Studio 17 2022",
