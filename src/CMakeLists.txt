@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.25)
 
 add_executable(${CMAKE_PROJECT_NAME} main.cpp)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC csparse_static)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EIGEN_STANDARD_LIBRARIES_TO_LINK_TO})
+# target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC csparse_static)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE shaders kompute::kompute)
+# target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE shaders kompute::kompute)
 
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
