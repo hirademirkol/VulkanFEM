@@ -20,24 +20,6 @@
 			}
 		},
 		{
-			"type": "shell",
-			"label": "Build Debug (CPU)",
-			"command": "cmake --build ${workspaceFolder}/build --config Debug",
-			"group": "build",
-			"icon": {
-				"id": "debug"
-			}
-		},
-		{
-			"type": "shell",
-			"label": "Build Release (CPU)",
-			"command": "cmake --build ${workspaceFolder}/build --config Release -DCMAKE_CXX_FLAGS:='/CPU=1'",
-			"group": "build",
-			"icon": {
-				"id": "package"
-			}
-		},
-		{
 			"type": "cmake",
 			"label": "CMake: Build",
 			"command": "build",

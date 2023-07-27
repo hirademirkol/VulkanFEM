@@ -112,9 +112,9 @@ template <class T>
 inline T Linearize(const Vec3<T> &v, const Vec3<T> &size) { return v.x + v.y * size.x + v.z * (size.x * size.y); }
 
 #define FOR3(vi, vi0, vi1)											\
-	for ((vi)##.z = (vi0)##.z; (vi)##.z < (vi1)##.z; (vi)##.z++)    \
-		for ((vi)##.y = (vi0)##.y; (vi)##.y < (vi1)##.y; (vi)##.y++)\
-			for ((vi)##.x = (vi0)##.x; (vi)##.x < (vi1)##.x; (vi)##.x++)
+	for ((vi).z = (vi0).z; (vi).z < (vi1).z; (vi).z++)    \
+		for ((vi).y = (vi0).y; (vi).y < (vi1).y; (vi).y++)\
+			for ((vi).x = (vi0).x; (vi).x < (vi1).x; (vi).x++)
 
 #define N_BITS_X 11
 #define N_BITS_Y 11
@@ -129,7 +129,7 @@ inline static int PackPosition(Vec3i vi)
 namespace std
 {
 	template <>
-	struct std::hash<Vec3i>
+	struct hash<Vec3i>
 	{
 		std::size_t operator()(const Vec3i& k) const
 		{
