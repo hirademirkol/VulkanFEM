@@ -17,7 +17,7 @@
 #include <Eigen/Sparse>
 #endif
 
-#define MAX_ITER 20
+#define MAX_ITER 200
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 
@@ -91,18 +91,23 @@ template<typename scalar>
 // cs* assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24])
 // #else
 #ifdef EIGEN
-Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24])
+Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
+//TODO: pass the used vertices out for applyBoundaryConditions to map global nodes to matrix nodes 
 #else
 Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24])
 #endif
 {
 	Vec3i vertexGridDimensions = voxelGridDimensions + Vec3i(1);
 
+	// int levels = 3;
 	std::vector<Vec3i> usedElements;
+	// std::vector<Vec3i> usedElementsInLevel[levels];
+
+
 	Vec3i element;
 	FOR3(element,  Vec3i(0), voxelGridDimensions)
 	{
-		if(voxelModel[Linearize(element, voxelGridDimensions)] == 1 /*&& !stationary(element)*/)
+		if(voxelModel[Linearize(element, voxelGridDimensions)] == 1)
 		{
 			usedElements.push_back(element);
 		}
@@ -111,8 +116,8 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 	Vec3i::MAX = std::max(vertexGridDimensions.x,vertexGridDimensions.y);
 	Vec3i::MAX = std::max(vertexGridDimensions.z, Vec3i::MAX);
 
-	std::map<uint64_t, uint64_t> usedVertices;
-	// std::vector<int> usedVertices;
+	std::map<uint64_t, uint64_t> usedNodes, freeNodes;
+	// std::vector<int> usedNodes;
 	Vec3i vert;
 
 	for(auto element : usedElements)
@@ -120,17 +125,22 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 		FOR3(vert, Vec3i(0), Vec3i(2))
 		{
 			auto val = Linearize(element + vert, vertexGridDimensions);
-			if(!usedVertices.contains(val))
+			if(!usedNodes.contains(val))
 			{
-				usedVertices[val] = val;
+				usedNodes[val] = val;
 			}
 		}
 	}
 
-	uint64_t index = 0;
-	for (auto line : usedVertices)
+	uint64_t index = 0, expectedIndex = 0;
+	for (auto line : usedNodes)
 	{
-		usedVertices[line.first] = index++;
+		if(fixedNodes.find(3*expectedIndex    ) == fixedNodes.end() ||
+		   fixedNodes.find(3*expectedIndex + 1) == fixedNodes.end() ||
+		   fixedNodes.find(3*expectedIndex + 2) == fixedNodes.end())
+			freeNodes[line.first] = index++;
+		else
+		{ expectedIndex++; }
 	}
 
 	std::vector<std::array<uint64_t, 8>> elementToGlobal;
@@ -139,14 +149,15 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 		std::array<uint64_t, 8> verts;
 		FOR3(vert, Vec3i(0), Vec3i(2))
 		{
-			verts[Linearize(vert, Vec3i(2))] = usedVertices[Linearize(element + vert, vertexGridDimensions)];
+			verts[Linearize(vert, Vec3i(2))] = freeNodes[Linearize(element + vert, vertexGridDimensions)];
 		}
 		elementToGlobal.push_back(verts);
 	}
 
 	// saveMatrix<uint64_t, 8>(elementToGlobal);
 
-	int size = usedVertices.size() * 3;
+	int size = freeNodes.size() * 3;
+
 
 // #ifdef CSPARSE
 // 	cs* systemMatrix = new cs();
@@ -195,8 +206,8 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 // 	std::cout << "System Matrix : Size:" << size << "x" << size << ", Non-Zero:" << systemMatrix->nz << ", " << ((float)systemMatrix->nz/size) << " full per row" << std::endl;
 #ifdef EIGEN
 	systemMatrix.setFromTriplets(triplets.begin(), triplets.end());
-	// systemMatrix.makeCompressed();
-	std::cout << "System Matrix : Size:" << size << "x" << size << ", Non-Zero:" << systemMatrix.nonZeros() << ", " << ((float)systemMatrix.nonZeros()/size) << " full per row" << std::endl;
+	systemMatrix.makeCompressed();
+	std::cout << "System Matrix : Size:" << systemMatrix.rows() << "x" << systemMatrix.cols() << ", Non-Zero:" << systemMatrix.nonZeros() << ", " << ((float)systemMatrix.nonZeros()/systemMatrix.rows()) << " full per row" << std::endl;
 #else
 	std::cout << "System Matrix : Size:" << size << "x" << size << ", Non-Zero:" << systemMatrix.data.size() << ", " << ((float)systemMatrix.data.size()/size) << " full per row" << std::endl;
 #endif
@@ -205,29 +216,26 @@ Mat<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, sca
 
 template <typename scalar>
 #ifdef EIGEN
-void applyBoundaryConditions(Eigen::SparseMatrix<scalar>& systemMatrix, std::vector<scalar> f, const std::vector<uint64_t>& fixedNodes)
+void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
+{
+	for(auto node : loadedNodes)
+	{
+		f[3*node.first] = node.second.x;
+		f[3*node.first + 1] = node.second.y;
+		f[3*node.first + 2] = node.second.z;
+	}
+}
 #else
 void applyBoundaryConditions(Mat<scalar>& systemMatrix, std::vector<scalar> f, const std::vector<uint64_t>& fixedNodes)
-#endif
 {
 	for(auto iter = fixedNodes.cend()-1; iter > fixedNodes.cbegin(); iter--)
 	{
-		// f.erase(*iter);
-
 		for(auto node : fixedNodes)
 		{
-			#ifdef EIGEN
-			// systemMatrix.coeffRef
-			#else
 			systemMatrix.data.erase(index(*iter, node, systemMatrix.rows));
-			#endif
 		}
 	}
-
-	#ifdef EIGEN
-	systemMatrix.makeCompressed();
-	#endif
-}
+#endif
 
 // template void applyBoundaryConditions<double>(Matd& systemMatrix, std::vector<double> f, const std::vector<uint64_t>& fixedNodes);
 // template void applyBoundaryConditions<float>(Matf& systemMatrix, std::vector<float> f, const std::vector<uint64_t>& fixedNodes);
@@ -362,7 +370,7 @@ namespace Eigen {
 										 const SparseMatrix<scalar> interpolation[],
 										 int numLevels)
 		{
-			MultigridPreconditioner::s_matrices = mat;
+			s_matrices = mat;
 			s_restrictionMatrices = restriction;
 			s_interpolationMatrices = interpolation;
 			s_numLevels = numLevels;
@@ -405,9 +413,9 @@ namespace Eigen {
 		/** \internal */
 		void _solve_impl(const Vector& b, Vector& x) const
 		{
-			Vector r = b - s_matrices[0] * x;
+			// Vector r = b - s_matrices[0] * x;
 
-			r *= m_invdiag;
+			// r *= m_invdiag;
 
 			// for(int i = 0; i < m_numLevels)
 			// {
@@ -423,7 +431,7 @@ namespace Eigen {
 			// 	r *= s_interpolationMatrices[i+1];
 			// }
 
-			x += r;
+			// x += r;
 		}
 
 		template<typename Rhs> inline const Solve<MultigridPreconditioner, Rhs>
@@ -454,17 +462,30 @@ namespace Eigen {
 
 template <typename scalar>
 #ifdef EIGEN
-void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x, const std::vector<uint64_t> &fixedNodes)
+void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
 {
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> b_eig(b.size());
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> x_eig(x.size());
 
 	memcpy(b_eig.data(), b.data(), b.size()*sizeof(scalar)); 
 
+	// int levels = 3; 
+	// Eigen::SparseMatrix<scalar> matrices[2];
+	// Eigen::SparseMatrix<scalar> restrictionMatrices[levels];
+	// Eigen::SparseMatrix<scalar> interpolationMatrices[levels];
 
-	// Eigen::MultigridPreconditioner<scalar>::SetMatrices();
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>, 1, Eigen::MultigridPreconditioner<scalar>> solver(A);
-	
+	// matrices[0] = A;
+	// restrictionMatrices
+
+
+	// for (int i = 0; i < levels; i++)
+	// {
+		
+	// }
+
+	// Eigen::MultigridPreconditioner<scalar>::SetMatrices(matrices, restrictionMatrices, interpolationMatrices, levels);
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>> solver(A);
+	// solver.setMaxIterations(MAX_ITER);
 	x_eig = solver.solve(b_eig);
 
 	std::cout << "#iterations:     " << solver.iterations() << std::endl;

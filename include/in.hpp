@@ -5,6 +5,9 @@
 #include <string>
 #include <filesystem>
 
+#include <set>
+#include <map>
+
 int* loadVoxel(int &sizeX, int &sizeY, int &sizeZ)
 {
     std::string line;
@@ -74,7 +77,7 @@ template void getKe<double>(double Ke[24][24]);
 template void getKe<float>(float Ke[24][24]);
 
 template <typename scalar>
-void getBoundaryConditions(std::vector<scalar>& f, std::vector<uint64_t>& fixedNodes)
+void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
 {
     std::string line;
     
@@ -86,13 +89,12 @@ void getBoundaryConditions(std::vector<scalar>& f, std::vector<uint64_t>& fixedN
     std::ifstream myfile (path.string());
 
     std::getline(myfile, line);
-    fixedNodes.resize(std::stoi(line));
+    int numFixed = std::stoi(line);
 
-    for(int i = 0; i < fixedNodes.size(); i++)
+    for(int i = 0; i < numFixed; i++)
     {
         std::getline(myfile, line);
-        fixedNodes[i] = std::stoull(line) - 1;
-        // f[fixedNodes[i]] = 0.0;
+        fixedNodes.insert(std::stoull(line) - 1);
     }
 
     myfile.close();
@@ -105,27 +107,29 @@ void getBoundaryConditions(std::vector<scalar>& f, std::vector<uint64_t>& fixedN
     myfile.open(path.string());
 
     std::getline(myfile, line);
-    int numLoad = std::stoi(line);
+    int numLoads = std::stoi(line);
 
-    for (int i = 0; i < numLoad; i++)
+    for (int i = 0; i < numLoads; i++)
     {
         std::getline(myfile, line, '\t');
-        uint64_t ind = std::stoull(line) - 1;
+        uint64_t ind = std::stoull(line) - 1 - numFixed;
 
         std::getline(myfile, line, '\t');
-        f[ind*3] = std::stod(line);
+        scalar x = std::stod(line);
         
         std::getline(myfile, line, '\t');
-        f[ind*3 + 1] = std::stod(line);
+        scalar y = std::stod(line);
 
         std::getline(myfile, line);
-        f[ind*3 + 2] = std::stod(line);
+        scalar z = std::stod(line);
+
+        loadedNodes[ind] = Vec3<scalar>(x,y,z);
     }
 
     myfile.close();
 }
 
-template void getBoundaryConditions<double>(std::vector<double>& f, std::vector<uint64_t>& fixedNodes);
-template void getBoundaryConditions<float>(std::vector<float>& f, std::vector<uint64_t>& fixedNodes);
+// template void getBoundaryConditions<double>(std::vector<double>& f, std::vector<uint64_t>& fixedNodes);
+// template void getBoundaryConditions<float>(std::vector<float>& f, std::vector<uint64_t>& fixedNodes);
 
 #endif // __IN_HPP__
