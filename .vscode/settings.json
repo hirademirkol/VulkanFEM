@@ -119,6 +119,15 @@
         "nonlinearoptimization": "cpp",
         "*.traits": "cpp",
         "*.expression": "cpp",
-        "*.evaluator": "cpp"
+        "*.evaluator": "cpp",
+        "core": "cpp",
+        "superlusupport": "cpp",
+        "autodiff": "cpp",
+        "bvh": "cpp",
+        "eulerangles": "cpp",
+        "kroneckerproduct": "cpp",
+        "numericaldiff": "cpp",
+        "specialfunctions": "cpp",
+        "splines": "cpp"
     },
 }
