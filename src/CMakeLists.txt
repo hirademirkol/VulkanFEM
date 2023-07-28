@@ -7,6 +7,12 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EIGEN_STANDARD_LIBRARIES_TO
 
 # target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE shaders kompute::kompute)
 
+add_library(utils utils.cpp)
+add_library(inout inout.cpp)
+add_library(ke Ke.cpp)
+add_library(fem FEM.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC utils inout ke fem)
+
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
     target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
