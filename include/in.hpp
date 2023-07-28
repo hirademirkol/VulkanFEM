@@ -12,7 +12,7 @@ int* loadVoxel(int &sizeX, int &sizeY, int &sizeZ)
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\voxelizedModel.bin";
+    std::filesystem::path file_path = "/../data/voxelizedModel.bin";
     path += file_path;
     
     std::ifstream myfile (path.string());
@@ -54,7 +54,7 @@ void getKe(scalar Ke[24][24])
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\Ke.txt";
+    std::filesystem::path file_path = "/../data/Ke.txt";
     path += file_path;
     
     std::ifstream myfile (path.string());
@@ -83,7 +83,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
     
     //fixing conditions
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\fixed.dat";
+    std::filesystem::path file_path = "/../data/fixed.dat";
     path += file_path;
 
     std::ifstream myfile (path.string());
@@ -101,7 +101,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
 
     //loading conditions
     path = std::filesystem::current_path();
-    file_path = "\\..\\data\\loading.dat";
+    file_path = "/../data/loading.dat";
     path += file_path;
 
     myfile.open(path.string());

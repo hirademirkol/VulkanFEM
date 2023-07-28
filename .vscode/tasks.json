@@ -23,9 +23,6 @@
 			"type": "cmake",
 			"label": "CMake: Build",
 			"command": "build",
-			"targets": [
-				"ALL_BUILD"
-			],
 			"group": {
 				"kind": "build",
 				"isDefault": true

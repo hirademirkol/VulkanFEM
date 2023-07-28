@@ -7,17 +7,9 @@
 
 #include <math.h>
 
-// #define CSPARSE
-#ifdef CSPARSE
-#include <cs.h>
-#endif
-
-#define EIGEN
-#ifdef EIGEN
 #include <Eigen/Sparse>
-#endif
 
-#define MAX_ITER 1000
+#define MAX_ITER 200
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 
@@ -271,11 +263,20 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 
 	// Eigen::MultigridPreconditioner<scalar>::SetMatrices(matrices, restrictionMatrices, interpolationMatrices, levels);
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>> solver(A);
-	solver.setMaxIterations(MAX_ITER);
+
+	solver.setMaxIterations((int)(MAX_ITER/10));
+
 	x_eig = solver.solve(b_eig);
 
-	std::cout << "#iterations:     " << solver.iterations() << std::endl;
-	std::cout << "estimated error: " << solver.error()      << std::endl;
+	for (int i = 0; i < MAX_ITER; i+=10)
+	{
+		x_eig = solver.solveWithGuess(b_eig, x_eig);
+		std::cout << "#iterations:     " << i << std::endl;
+		std::cout << "estimated error: " << solver.error()      << std::endl;
+	}
+
+	std::cout << "Final #iterations:     " << MAX_ITER << std::endl;
+	std::cout << "Final estimated error: " << solver.error()      << std::endl;
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
