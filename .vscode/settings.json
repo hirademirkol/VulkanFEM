@@ -128,6 +128,11 @@
         "kroneckerproduct": "cpp",
         "numericaldiff": "cpp",
         "specialfunctions": "cpp",
-        "splines": "cpp"
+        "splines": "cpp",
+        "*.tcc": "cpp",
+        "string_view": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "cinttypes": "cpp"
     },
 }
