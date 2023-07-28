@@ -268,10 +268,13 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 
 	x_eig = solver.solve(b_eig);
 
-	for (int i = 0; i < MAX_ITER; i+=10)
+	std::cout << "#iterations:     " << (int)(MAX_ITER/10) << std::endl;
+	std::cout << "estimated error: " << solver.error()      << std::endl;
+	
+	for (int i = (int)(MAX_ITER/10); i < MAX_ITER; i+=(int)(MAX_ITER/10))
 	{
 		x_eig = solver.solveWithGuess(b_eig, x_eig);
-		std::cout << "#iterations:     " << i << std::endl;
+		std::cout << "#iterations:     " << i + (int)(MAX_ITER/10) << std::endl;
 		std::cout << "estimated error: " << solver.error()      << std::endl;
 	}
 

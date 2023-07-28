@@ -96,7 +96,7 @@ template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name = "matrix")
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\" + name + ".txt";
+    std::filesystem::path file_path = "/../data/out/" + name + ".txt";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -110,7 +110,7 @@ template <typename T>
 void saveVector(std::vector<T> data, std::string name = "vector")
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\" + name + ".csv";
+    std::filesystem::path file_path = "/../data/out/" + name + ".csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -129,7 +129,7 @@ template <typename T, size_t l>
 void saveMatrix(std::vector<std::array<T,l>> data, std::string name = "matrix")
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\" + name + ".txt";
+    std::filesystem::path file_path = "/../data/out/out/" + name + ".txt";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -149,7 +149,7 @@ template <typename T>
 void saveMatrix(std::map<uint64_t, T> data, int rows, std::string name = "matrix")
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\" + name + ".csv";
+    std::filesystem::path file_path = "/../data/out/" + name + ".csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -175,7 +175,7 @@ template<typename T>
 void printModel(T* model, int numElements)
 {
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "\\..\\data\\result.bin";
+    std::filesystem::path file_path = "/../data/out/result.bin";
 	path += file_path;
     
     std::ofstream myfile (path.string());
