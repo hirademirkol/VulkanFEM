@@ -1,9 +1,6 @@
 [submodule "external/kompute"]
 	path = external/kompute
 	url = https://github.com/KomputeProject/kompute
-[submodule "external/SuiteSparse"]
-	path = external/SuiteSparse
-	url = https://github.com/DrTimothyAldenDavis/SuiteSparse
 [submodule "external/eigen"]
 	path = external/eigen
 	url = D:/Master/Code/external/eigen
