@@ -23,17 +23,4 @@ void saveMatrix(std::map<uint64_t, T> data, int rows, std::string name = "matrix
 template <typename T>
 void printMatrix(std::vector<std::vector<T>> data);
 
-
-template void saveMatrix<double>(std::vector<std::vector<double>> data, std::string name);
-template void saveMatrix<float>(std::vector<std::vector<float>> data, std::string name);
-
-template void saveVector<double>(std::vector<double> data, std::string name);
-template void saveVector<float>(std::vector<float> data, std::string name);
-
-template void saveMatrix<double>(std::map<uint64_t, double> data, int rows, std::string name);
-template void saveMatrix<float>(std::map<uint64_t, float> data, int rows, std::string name);
-
-template void printMatrix<double>(std::vector<std::vector<double>> data);
-template void printMatrix<float>(std::vector<std::vector<float>> data);
-
 #endif // __OUT_HPP__
