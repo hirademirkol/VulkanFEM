@@ -98,6 +98,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	return systemMatrix;
 }
 
+template Eigen::SparseMatrix<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, float elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+
 template <typename scalar>
 void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
 {
@@ -108,6 +111,9 @@ void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<sca
 		f[3*node.first + 2] = node.second.z;
 	}
 }
+
+template void applyBoundaryConditions<double>(std::vector<double>& f, std::map<uint64_t, Vec3<double>>& loadedNodes);
+template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uint64_t, Vec3<float>>& loadedNodes);
 
 template <typename scalar>
 void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
@@ -153,3 +159,6 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
+
+template void solveWithCG<double>(const Eigen::SparseMatrix<double>& A, const std::vector<double>& b, std::vector<double>& x);
+template void solveWithCG<float>(const Eigen::SparseMatrix<float>& A, const std::vector<float>& b, std::vector<float>& x);
