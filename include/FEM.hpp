@@ -14,7 +14,7 @@
 
 #include <Eigen/Sparse>
 
-#define MAX_ITER 200
+// #define MAX_ITER 100
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 

@@ -8,7 +8,7 @@ int* loadVoxel(int &sizeX, int &sizeY, int &sizeZ)
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/voxelizedModel.bin";
+    std::filesystem::path file_path = "/data/voxelizedModel.bin";
     path += file_path;
     
     std::ifstream myfile (path.string());
@@ -51,7 +51,7 @@ void getKe(scalar Ke[24][24])
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/Ke.txt";
+    std::filesystem::path file_path = "/data/Ke.txt";
     path += file_path;
     
     std::ifstream myfile (path.string());
@@ -80,7 +80,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
     
     //fixing conditions
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/fixed.dat";
+    std::filesystem::path file_path = "/data/fixed.dat";
     path += file_path;
 
     std::ifstream myfile (path.string());
@@ -98,7 +98,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
 
     //loading conditions
     path = std::filesystem::current_path();
-    file_path = "/../data/loading.dat";
+    file_path = "/data/loading.dat";
     path += file_path;
 
     myfile.open(path.string());
@@ -178,53 +178,11 @@ void outMatrix(std::vector<std::vector<T>> data, std::ostream &outStream)
 template void saveMatrix<double>(std::vector<std::vector<double>> data, std::string name);
 template void saveMatrix<float>(std::vector<std::vector<float>> data, std::string name);
 
-template <typename T, size_t lineLength>
-void outMatrix(std::vector<std::array<T, lineLength>> data, std::ostream &outStream)
-{
-	int n = data.size();
-	int m = data[0].size();
-	
-	if(n == 1)
-	{
-		outStream << "[ " << data[0][0];
-		for (int j = 1; j < m-1; j++)
-		{
-			outStream << "\t" << data[0][j];
-		}
-		outStream << "\t" << data[0][m-1] << " ]" << std::endl;
-		return;
-	}
-
-	outStream << "⎡ " << data[0][0];
-	for (int j = 1; j < m-1; j++)
-	{
-		outStream << "\t" << data[0][j];
-	}
-	outStream << "\t" << data[0][m-1] << " ⎤" << std::endl;
-
-	for (int i = 1; i < n-1; i++)
-	{
-		outStream << "⎢ " << data[i][0];
-		for (int j= 1; j < m-1; j++)
-		{
-			outStream << "\t" << data[i][j];
-		}
-		outStream << "\t" << data[i][m-1] << " ⎥" << std::endl;
-	}
-
-	outStream << "⎣ " << data[n-1][0];
-	for (int j= 1; j < m-1; j++)
-	{
-		outStream << "\t" << data[n-1][j];
-	}
-	outStream << "\t" << data[n-1][m-1] << " ⎦" << std::endl;
-}
-
 template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/out/" + name + ".txt";
+    std::filesystem::path file_path = "/data/out/" + name + ".txt";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -241,15 +199,17 @@ template <typename T>
 void saveVector(std::vector<T> data, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/out/" + name + ".csv";
+    std::filesystem::path file_path = "/data/out/" + name + ".csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
 
+    myfile << std::to_string(data[0]);
+
 	int n = data.size();
-	for (int j = 0; j < n; j++)
+	for (int j = 1; j < n; j++)
 	{
-		myfile << "," << data[j];
+		myfile << "," << std::to_string(data[j]);
 	}
 	myfile << std::endl;
 	
@@ -263,7 +223,7 @@ template <typename T>
 void saveMatrix(std::map<uint64_t, T> data, int rows, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/out/" + name + ".csv";
+    std::filesystem::path file_path = "/data/out/" + name + ".csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -289,7 +249,7 @@ template<typename T>
 void printModel(T* model, int numElements)
 {
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/../data/out/result.bin";
+    std::filesystem::path file_path = "/data/out/result.bin";
 	path += file_path;
     
     std::ofstream myfile (path.string());
