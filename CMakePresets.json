@@ -2,30 +2,44 @@
     "version": 2,
     "configurePresets": [
         {
-            "name": "windows",
-            "displayName": "Windows x64 Debug",
-            "description": "Sets Ninja generator, compilers, x64 architecture, build and install directory, debug build type",
+            "name": "Windows",
+            "description": "Sets Visual Studio generator, compilers, x64 architecture, build and install directory, debug build type",
             "generator": "Visual Studio 17 2022",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
             }
         },
         {
-            "name": "linux",
-            "displayName": "Linux Debug",
-            "description": "Sets Ninja generator, compilers, build and install directory, debug build type",
+            "name": "Linux",
+            "description": "Sets Makefiles generator, compilers, build and install directory, debug build type",
             "generator": "Unix Makefiles",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
-              "CMAKE_BUILD_TYPE": "Debug",
-              "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
             }
-          }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "Windows Debug",
+            "configurePreset": "Windows",
+            "configuration": "Debug"
+        },
+        {
+            "name": "Windows Release",
+            "configurePreset": "Windows",
+            "configuration": "Release"
+        },
+        {
+            "name": "Linux Debug",
+            "configurePreset": "Linux",
+            "configuration": "Debug"
+        },
+        {
+            "name": "Linux Release",
+            "configurePreset": "Linux",
+            "configuration": "Release"
+        }
     ]
 }

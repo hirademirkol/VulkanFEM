@@ -1,9 +1,13 @@
+#include "out.hpp"
 #include "FEM.hpp"
+#include "IncompleteCholeskyPreconditioner.hpp"
 
 //TODO: pass the used vertices out for applyBoundaryConditions to map global nodes to matrix nodes 
 template<typename scalar>
 Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
 {
+
+	std::cout << "Assembling the system matrix" << std::endl;
 	Vec3i vertexGridDimensions = voxelGridDimensions + Vec3i(1);
 
 	// int levels = 3;
@@ -38,16 +42,16 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
-	uint64_t index = 0, expectedIndex = 0;
+	uint64_t index = 1, expectedIndex = 0;
 	for (auto line : usedNodes)
 	{
-		if(fixedNodes.find(3*expectedIndex    ) == fixedNodes.end() ||
-		   fixedNodes.find(3*expectedIndex + 1) == fixedNodes.end() ||
-		   fixedNodes.find(3*expectedIndex + 2) == fixedNodes.end())
+		if(fixedNodes.find(expectedIndex) == fixedNodes.end())
 			freeNodes[line.first] = index++;
-		else
-		{ expectedIndex++; }
+		
+		expectedIndex++;
 	}
+
+	int size = freeNodes.size() * 3;
 
 	std::vector<std::array<uint64_t, 8>> elementToGlobal;
 	for (auto element : usedElements)
@@ -55,23 +59,21 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		std::array<uint64_t, 8> verts;
 		FOR3(vert, Vec3i(0), Vec3i(2))
 		{
-			verts[Linearize(vert, Vec3i(2))] = freeNodes[Linearize(element + vert, vertexGridDimensions)];
+			verts[Linearize(vert, Vec3i(2))] = freeNodes[Linearize(element + vert, vertexGridDimensions)] - 1;
 		}
 		elementToGlobal.push_back(verts);
 	}
 
 	// saveMatrix<uint64_t, 8>(elementToGlobal);
 
-	int size = freeNodes.size() * 3;
-
 	Eigen::SparseMatrix<scalar> systemMatrix(size, size);
 	std::vector<Eigen::Triplet<scalar>> triplets;
-
+	// std::vector<scalar> ind,jnd,v;
 	for(auto line : elementToGlobal)
 	{
 		FOR3(vert, Vec3i(0), Vec3i(2))
 		{
-			Vec3i vert2; 
+			Vec3i vert2;
 			FOR3(vert2, Vec3i(0), Vec3i(2))
 			{
 				auto i = Linearize(vert,  Vec3i(2));
@@ -80,16 +82,26 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 				auto iGlobal = line[i];
 				auto jGlobal = line[j];
 
+				if(iGlobal == -1 || jGlobal == -1)
+					continue;
+
 				for(int c1 = 0; c1 < 3; c1++)
 				{
 					for(int c2 = 0; c2 < 3; c2++)
 					{
 						triplets.push_back(Eigen::Triplet<scalar>(iGlobal*3 + c1, jGlobal*3 + c2, get_symmetric(elementStiffness,i*3 + c1,j*3 + c2)));
+						// ind.push_back(iGlobal*3 + c1);
+						// jnd.push_back(jGlobal*3 + c2);
+						// v.push_back(get_symmetric(elementStiffness,i*3 + c1,j*3 + c2));
 					}
 				}
 			}
 		}
 	}
+
+	// saveVector(ind, "i");
+	// saveVector(jnd, "j");
+	// saveVector(v, "v");
 
 	systemMatrix.setFromTriplets(triplets.begin(), triplets.end());
 	systemMatrix.makeCompressed();
@@ -123,39 +135,20 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 
 	memcpy(b_eig.data(), b.data(), b.size()*sizeof(scalar)); 
 
-	// int levels = 3; 
-	// Eigen::SparseMatrix<scalar> matrices[2];
-	// Eigen::SparseMatrix<scalar> restrictionMatrices[levels];
-	// Eigen::SparseMatrix<scalar> interpolationMatrices[levels];
+	std::cout << "Setting up the CG solver with Incomplete Cholesky Preconditioner" << std::endl;
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>, Eigen::Lower, Eigen::IncompleteCholeskyPreconditioner<scalar>> solver(A);
 
-	// matrices[0] = A;
-	// restrictionMatrices
+	
+#ifdef MAX_ITER
+	solver.setMaxIterations(MAX_ITER);
+#endif
 
-
-	// for (int i = 0; i < levels; i++)
-	// {
-		
-	// }
-
-	// Eigen::MultigridPreconditioner<scalar>::SetMatrices(matrices, restrictionMatrices, interpolationMatrices, levels);
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>> solver(A);
-
-	solver.setMaxIterations((int)(MAX_ITER/10));
-
+	std::cout << "Starting the solver" << std::endl;
 	x_eig = solver.solve(b_eig);
 
-	std::cout << "#iterations:     " << (int)(MAX_ITER/10) << std::endl;
-	std::cout << "estimated error: " << solver.error()      << std::endl;
-	
-	for (int i = (int)(MAX_ITER/10); i < MAX_ITER; i+=(int)(MAX_ITER/10))
-	{
-		x_eig = solver.solveWithGuess(b_eig, x_eig);
-		std::cout << "#iterations:     " << i + (int)(MAX_ITER/10) << std::endl;
-		std::cout << "estimated error: " << solver.error()      << std::endl;
-	}
+	std::cout << "#iterations:     " << solver.iterations() << std::endl;
+	std::cout << "Estimated error: " << solver.error()      << std::endl;
 
-	std::cout << "Final #iterations:     " << MAX_ITER << std::endl;
-	std::cout << "Final estimated error: " << solver.error()      << std::endl;
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
