@@ -7,6 +7,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name = "matrix");
