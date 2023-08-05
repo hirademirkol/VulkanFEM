@@ -149,7 +149,7 @@ template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uin
 
 #ifdef MATRIX_FREE
 template <typename scalar>
-void solveWithCG(const MatrixFreeSparse& A, const std::vector<double>& b, std::vector<double>& x)
+void solveWithCG(const MatrixFreeSparse& A, const std::vector<scalar>& b, std::vector<scalar>& x)
 #else
 template <typename scalar>
 void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
