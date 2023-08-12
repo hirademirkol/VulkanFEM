@@ -37,15 +37,15 @@ public:
     return Eigen::Product<MatrixFreeSparse,Rhs,Eigen::AliasFreeProduct>(*this, x.derived());
   }
 
-  MatrixFreeSparse() : elementStiffnessMat(0), elementToNode(0) {}
+  MatrixFreeSparse(){}
 
-  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 300, 1> _elementStiffnessMat, std::vector<std::array<uint64_t, 8>> _elementToNode) 
+  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 24, 24> _elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> _elementToNode) 
                   : numElements(_numElements),
                     elementStiffnessMat(_elementStiffnessMat),
                     elementToNode(_elementToNode) {}
 
-  const Eigen::Matrix<double, 300, 1> elementStiffnessMat;
-	std::vector<std::array<uint64_t, 8>> elementToNode;
+  const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
+	Eigen::Array<int, Eigen::Dynamic, 8> elementToNode;
   StorageIndex numElements;
 
 };
@@ -68,31 +68,13 @@ namespace internal {
       assert(alpha==Scalar(1) && "scaling is not implemented");
       EIGEN_ONLY_USED_FOR_DEBUG(alpha);
  
-      // Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
-      // but let's do something fancier (and less efficient):
-      for(auto line : lhs.elementToNode)
+      const Array<int, 1, 24> c{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+      const Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
+
+      for(auto line : lhs.elementToNode.rowwise())
       {
-        for(int i = 0; i < 8; i++)
-          for(int j = 0; j < 8; j++)
-          {
-            uint64_t node1 = line[i];
-            uint64_t node2 = line[j];
-            
-            if(node1 == -1 || node2 == -1)
-					  continue;
-
-            for(int c1 = 0; c1 < 3; c1++)
-            {
-              for(int c2 = 0; c2 < 3; c2++)
-              {
-                int iMatrix = node1*3 + c1;
-                int jMatrix = node2*3 + c2;
-                int elementIndex = i <= j ? (i*(47-i))/2 + j + 1 : (j*(47-j))/2 + i + 1;
-
-                dst(i) += lhs.elementStiffnessMat(elementIndex) * rhs(j);
-              }
-            }
-          }
+        Array<int, 1, 24> xs = 3 * line(xInd) + c;
+        dst(xs) += lhs.elementStiffnessMat * rhs(xs);       
       }
     };
   };
