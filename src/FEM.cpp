@@ -47,35 +47,45 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
-	uint64_t index = 1, expectedIndex = 0;
+	// uint64_t index = 1, expectedIndex = 0;
+	// for (auto line : usedNodes)
+	// {
+	// 	if(fixedNodes.find(expectedIndex) == fixedNodes.end())
+	// 		freeNodes[line.first] = index++;
+		
+	// 	expectedIndex++;
+	// }
+
+	uint64_t index = 0;
 	for (auto line : usedNodes)
 	{
-		if(fixedNodes.find(expectedIndex) == fixedNodes.end())
-			freeNodes[line.first] = index++;
-		
-		expectedIndex++;
+		usedNodes[line.first] = index++;
 	}
 
-	int size = freeNodes.size() * 3;
-
-	std::vector<std::array<uint64_t, 8>> elementToGlobal;
+	int size = usedNodes.size() * 3;
+	int line = 0;
+	Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobal(usedElements.size(), 8);
 	for (auto element : usedElements)
 	{
-		std::array<uint64_t, 8> verts;
 		FOR3(vert, Vec3i(0), Vec3i(2))
 		{
-			verts[Linearize(vert, Vec3i(2))] = freeNodes[Linearize(element + vert, vertexGridDimensions)] - 1;
+			elementToGlobal(line, Linearize(vert, Vec3i(2))) = (int)usedNodes[Linearize(element + vert, vertexGridDimensions)];
 		}
-		elementToGlobal.push_back(verts);
+		line++;
 	}
 	// saveMatrix<uint64_t, 8>(elementToGlobal);
 
 #ifdef MATRIX_FREE
-	Eigen::Matrix<scalar, 300, 1> elementStiffnessMatrix;
+	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
 	for(int i = 0; i < 24; i++)
-	for(int j = 0; j < i + 1; i++)
 	{
-		elementStiffnessMatrix((j*(47-j))/2 + i + 1) = elementStiffness[i][j];
+		elementStiffnessMatrix(i,i) = elementStiffness[i][i];
+		for(int j = 0; j < i ; j++)
+		{
+			// elementStiffnessMatrix[(j*(47-j))/2 + i] = elementStiffness[i][j];
+			elementStiffnessMatrix(i,j) = elementStiffness[i][j];
+			elementStiffnessMatrix(j,i) = elementStiffness[i][j];
+		}
 	}
 
 
@@ -178,6 +188,11 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 	std::cout << "#iterations:     " << solver.iterations() << std::endl;
 	std::cout << "Estimated error: " << solver.error()      << std::endl;
 
+	// for(int i = 0; i < 20; i++)
+	// {
+	// 	x_eig = solver.solveWithGuess(b_eig, x_eig);
+	// 	std::cout << "Estimated error: " << solver.error()      << std::endl;
+	// }
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
