@@ -47,14 +47,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
-	// uint64_t index = 1, expectedIndex = 0;
-	// for (auto line : usedNodes)
-	// {
-	// 	if(fixedNodes.find(expectedIndex) == fixedNodes.end())
-	// 		freeNodes[line.first] = index++;
-		
-	// 	expectedIndex++;
-	// }
+#ifdef MATRIX_FREE
 
 	uint64_t index = 0;
 	for (auto line : usedNodes)
@@ -73,28 +66,52 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 		line++;
 	}
-	// saveMatrix<uint64_t, 8>(elementToGlobal);
 
-#ifdef MATRIX_FREE
 	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
 	for(int i = 0; i < 24; i++)
 	{
 		elementStiffnessMatrix(i,i) = elementStiffness[i][i];
 		for(int j = 0; j < i ; j++)
 		{
-			// elementStiffnessMatrix[(j*(47-j))/2 + i] = elementStiffness[i][j];
-			elementStiffnessMatrix(i,j) = elementStiffness[i][j];
-			elementStiffnessMatrix(j,i) = elementStiffness[i][j];
+			elementStiffnessMatrix(i,j) = elementStiffness[j][i];
+			elementStiffnessMatrix(j,i) = elementStiffness[j][i];
 		}
 	}
 
+	Eigen::ArrayXi fixed(fixedNodes.size());
 
-	MatrixFreeSparse systemMatrix(size, elementStiffnessMatrix, elementToGlobal);
+	index = 0;
+	for(auto val : fixedNodes)
+	{
+		fixed[index++] = (int)val;
+	}
+	MatrixFreeSparse systemMatrix(size, elementStiffnessMatrix, elementToGlobal, fixed);
 #else
+
+	uint64_t index = 1, expectedIndex = 0;
+	for (auto line : usedNodes)
+	{
+		if(fixedNodes.find(expectedIndex) == fixedNodes.end())
+			freeNodes[line.first] = index++;
+		
+		expectedIndex++;
+	}
+
+	int size = freeNodes.size() * 3;
+
+	std::vector<std::array<uint64_t, 8>> elementToGlobal;
+	for (auto element : usedElements)
+	{
+		std::array<uint64_t, 8> verts;
+		FOR3(vert, Vec3i(0), Vec3i(2))
+		{
+			verts[Linearize(vert, Vec3i(2))] = freeNodes[Linearize(element + vert, vertexGridDimensions)] - 1;
+		}
+		elementToGlobal.push_back(verts);
+	}
 
 	Eigen::SparseMatrix<scalar> systemMatrix(size, size);
 	std::vector<Eigen::Triplet<scalar>> triplets;
-	// std::vector<scalar> ind,jnd,v;
 	for(auto line : elementToGlobal)
 	{
 		FOR3(vert, Vec3i(0), Vec3i(2))
@@ -116,23 +133,17 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 					for(int c2 = 0; c2 < 3; c2++)
 					{
 						triplets.push_back(Eigen::Triplet<scalar>(iGlobal*3 + c1, jGlobal*3 + c2, get_symmetric(elementStiffness,i*3 + c1,j*3 + c2)));
-						// ind.push_back(iGlobal*3 + c1);
-						// jnd.push_back(jGlobal*3 + c2);
-						// v.push_back(get_symmetric(elementStiffness,i*3 + c1,j*3 + c2));
 					}
 				}
 			}
 		}
 	}
 
-	// saveVector(ind, "i");
-	// saveVector(jnd, "j");
-	// saveVector(v, "v");
-
 	systemMatrix.setFromTriplets(triplets.begin(), triplets.end());
 	systemMatrix.makeCompressed();
 	std::cout << "System Matrix : Size:" << systemMatrix.rows() << "x" << systemMatrix.cols() << ", Non-Zero:" << systemMatrix.nonZeros() << ", " << ((float)systemMatrix.nonZeros()/systemMatrix.rows()) << " full per row" << std::endl;
 #endif
+
 	return systemMatrix;
 }
 
@@ -170,11 +181,11 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 
 	memcpy(b_eig.data(), b.data(), b.size()*sizeof(scalar)); 
 
-	std::cout << "Setting up the CG solver with Incomplete Cholesky Preconditioner" << std::endl;
-
 #ifdef MATRIX_FREE
+	std::cout << "Setting up the CG solver with Matrix Free Formulation" << std::endl;
 	Eigen::ConjugateGradient<MatrixFreeSparse, Eigen::Lower | Eigen::Upper, Eigen::IdentityPreconditioner> solver(A);
 #else
+	std::cout << "Setting up the CG solver with Incomplete Cholesky Preconditioner" << std::endl;
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>, Eigen::Lower, Eigen::IncompleteCholeskyPreconditioner<scalar>> solver(A);
 #endif
 	

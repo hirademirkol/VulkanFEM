@@ -39,13 +39,17 @@ public:
 
   MatrixFreeSparse(){}
 
-  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 24, 24> _elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> _elementToNode) 
+  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 24, 24> _elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> _elementToNode, Eigen::ArrayXi _fixedNodes) 
                   : numElements(_numElements),
                     elementStiffnessMat(_elementStiffnessMat),
-                    elementToNode(_elementToNode) {}
+                    elementToNode(_elementToNode),
+                    fixedNodes(_fixedNodes) {}
+
 
   const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
 	Eigen::Array<int, Eigen::Dynamic, 8> elementToNode;
+  Eigen::ArrayXi fixedNodes;
+  
   StorageIndex numElements;
 
 };
@@ -74,8 +78,12 @@ namespace internal {
       for(auto line : lhs.elementToNode.rowwise())
       {
         Array<int, 1, 24> xs = 3 * line(xInd) + c;
-        dst(xs) += lhs.elementStiffnessMat * rhs(xs);       
+        dst(xs) += lhs.elementStiffnessMat * rhs(xs);
       }
+
+      dst(3 * lhs.fixedNodes    ) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
+      dst(3 * lhs.fixedNodes + 1) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
+      dst(3 * lhs.fixedNodes + 2) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
     };
   };
 }
