@@ -15,7 +15,7 @@
 #include <Eigen/Sparse>
 
 #define MATRIX_FREE
-// #define MAX_ITER 100
+// #define MAX_ITER 1000
 
 #ifdef MATRIX_FREE
 #include "MatrixFreeSparse.hpp"
