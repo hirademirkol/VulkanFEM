@@ -110,7 +110,7 @@ int main()
 	f.resize(numDoF, 0.0);
 	u.resize(numDoF, 0.0);
 
-	applyBoundaryConditions(f, loadedNodes);
+	applyBoundaryConditions(f, loadedNodes, fixedNodes);
 
 #ifdef CPU
 	solveWithCG<double>(systemMatrix, f, u);

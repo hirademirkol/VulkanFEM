@@ -2,6 +2,8 @@
 #include "FEM.hpp"
 #include "IncompleteCholeskyPreconditioner.hpp"
 
+#include <chrono>
+
 //TODO: pass the used vertices out for applyBoundaryConditions to map global nodes to matrix nodes
 #ifdef MATRIX_FREE
 template<typename scalar>
@@ -155,18 +157,23 @@ template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel,
 #endif
 
 template <typename scalar>
-void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
+void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes, const std::set<uint64_t>& fixedNodes)
 {
 	for(auto node : loadedNodes)
 	{
-		f[3*node.first] = node.second.x;
-		f[3*node.first + 1] = node.second.y;
-		f[3*node.first + 2] = node.second.z;
+#ifdef MATRIX_FREE
+        uint64_t ind = node.first;
+#else
+        uint64_t ind = node.first - fixedNodes.size();
+#endif
+		f[3*ind    ] = node.second.x;
+		f[3*ind + 1] = node.second.y;
+		f[3*ind + 2] = node.second.z;
 	}
 }
 
-template void applyBoundaryConditions<double>(std::vector<double>& f, std::map<uint64_t, Vec3<double>>& loadedNodes);
-template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uint64_t, Vec3<float>>& loadedNodes);
+template void applyBoundaryConditions<double>(std::vector<double>& f, std::map<uint64_t, Vec3<double>>& loadedNodes, const std::set<uint64_t>& fixedNodes);
+template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uint64_t, Vec3<float>>& loadedNodes, const std::set<uint64_t>& fixedNodes);
 
 #ifdef MATRIX_FREE
 template <typename scalar>
@@ -194,16 +201,15 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 #endif
 
 	std::cout << "Starting the solver" << std::endl;
+
+	auto start = std::chrono::system_clock::now();
 	x_eig = solver.solve(b_eig);
+	auto end = std::chrono::system_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 
-	std::cout << "#iterations:     " << solver.iterations() << std::endl;
-	std::cout << "Estimated error: " << solver.error()      << std::endl;
-
-	// for(int i = 0; i < 20; i++)
-	// {
-	// 	x_eig = solver.solveWithGuess(b_eig, x_eig);
-	// 	std::cout << "Estimated error: " << solver.error()      << std::endl;
-	// }
+	std::cout << "Solving took:    " << duration.count() << " s" << std::endl;
+	std::cout << "#iterations:     " << solver.iterations()      << std::endl;
+	std::cout << "Estimated error: " << solver.error()           << std::endl;
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }

@@ -51,7 +51,6 @@ public:
   Eigen::ArrayXi fixedNodes;
   
   StorageIndex numElements;
-
 };
 
 
@@ -72,7 +71,7 @@ namespace internal {
       assert(alpha==Scalar(1) && "scaling is not implemented");
       EIGEN_ONLY_USED_FOR_DEBUG(alpha);
  
-      const Array<int, 1, 24> c{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+      const Array<int, 1, 24> c   {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
       const Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
 
       for(auto line : lhs.elementToNode.rowwise())
