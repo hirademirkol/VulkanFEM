@@ -2,9 +2,16 @@
 #include "FEM.hpp"
 #include "IncompleteCholeskyPreconditioner.hpp"
 
-//TODO: pass the used vertices out for applyBoundaryConditions to map global nodes to matrix nodes 
+#include <chrono>
+
+//TODO: pass the used vertices out for applyBoundaryConditions to map global nodes to matrix nodes
+#ifdef MATRIX_FREE
+template<typename scalar>
+MatrixFreeSparse assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
+#else
 template<typename scalar>
 Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
+#endif
 {
 
 	std::cout << "Assembling the system matrix" << std::endl;
@@ -42,6 +49,47 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
+#ifdef MATRIX_FREE
+
+	uint64_t index = 0;
+	for (auto line : usedNodes)
+	{
+		usedNodes[line.first] = index++;
+	}
+
+	int size = usedNodes.size() * 3;
+	int line = 0;
+	Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobal(usedElements.size(), 8);
+	for (auto element : usedElements)
+	{
+		FOR3(vert, Vec3i(0), Vec3i(2))
+		{
+			elementToGlobal(line, Linearize(vert, Vec3i(2))) = (int)usedNodes[Linearize(element + vert, vertexGridDimensions)];
+		}
+		line++;
+	}
+
+	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
+	for(int i = 0; i < 24; i++)
+	{
+		elementStiffnessMatrix(i,i) = elementStiffness[i][i];
+		for(int j = 0; j < i ; j++)
+		{
+			elementStiffnessMatrix(i,j) = elementStiffness[j][i];
+			elementStiffnessMatrix(j,i) = elementStiffness[j][i];
+		}
+	}
+
+	Eigen::ArrayXi fixed(fixedNodes.size());
+
+	index = 0;
+	for(auto val : fixedNodes)
+	{
+		fixed[index++] = (int)val;
+	}
+	MatrixFreeSparse systemMatrix(size, elementStiffnessMatrix, elementToGlobal, fixed);
+#else
+
 	uint64_t index = 1, expectedIndex = 0;
 	for (auto line : usedNodes)
 	{
@@ -64,11 +112,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToGlobal.push_back(verts);
 	}
 
-	// saveMatrix<uint64_t, 8>(elementToGlobal);
-
 	Eigen::SparseMatrix<scalar> systemMatrix(size, size);
 	std::vector<Eigen::Triplet<scalar>> triplets;
-	// std::vector<scalar> ind,jnd,v;
 	for(auto line : elementToGlobal)
 	{
 		FOR3(vert, Vec3i(0), Vec3i(2))
@@ -90,68 +135,88 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 					for(int c2 = 0; c2 < 3; c2++)
 					{
 						triplets.push_back(Eigen::Triplet<scalar>(iGlobal*3 + c1, jGlobal*3 + c2, get_symmetric(elementStiffness,i*3 + c1,j*3 + c2)));
-						// ind.push_back(iGlobal*3 + c1);
-						// jnd.push_back(jGlobal*3 + c2);
-						// v.push_back(get_symmetric(elementStiffness,i*3 + c1,j*3 + c2));
 					}
 				}
 			}
 		}
 	}
 
-	// saveVector(ind, "i");
-	// saveVector(jnd, "j");
-	// saveVector(v, "v");
-
 	systemMatrix.setFromTriplets(triplets.begin(), triplets.end());
 	systemMatrix.makeCompressed();
 	std::cout << "System Matrix : Size:" << systemMatrix.rows() << "x" << systemMatrix.cols() << ", Non-Zero:" << systemMatrix.nonZeros() << ", " << ((float)systemMatrix.nonZeros()/systemMatrix.rows()) << " full per row" << std::endl;
+#endif
 
 	return systemMatrix;
 }
 
+#ifdef MATRIX_FREE
+template MatrixFreeSparse assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+#else
 template Eigen::SparseMatrix<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, float elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+#endif
 
 template <typename scalar>
-void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
+void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes, const std::set<uint64_t>& fixedNodes)
 {
 	for(auto node : loadedNodes)
 	{
-		f[3*node.first] = node.second.x;
-		f[3*node.first + 1] = node.second.y;
-		f[3*node.first + 2] = node.second.z;
+#ifdef MATRIX_FREE
+        uint64_t ind = node.first;
+#else
+        uint64_t ind = node.first - fixedNodes.size();
+#endif
+		f[3*ind    ] = node.second.x;
+		f[3*ind + 1] = node.second.y;
+		f[3*ind + 2] = node.second.z;
 	}
 }
 
-template void applyBoundaryConditions<double>(std::vector<double>& f, std::map<uint64_t, Vec3<double>>& loadedNodes);
-template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uint64_t, Vec3<float>>& loadedNodes);
+template void applyBoundaryConditions<double>(std::vector<double>& f, std::map<uint64_t, Vec3<double>>& loadedNodes, const std::set<uint64_t>& fixedNodes);
+template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uint64_t, Vec3<float>>& loadedNodes, const std::set<uint64_t>& fixedNodes);
 
+#ifdef MATRIX_FREE
+template <typename scalar>
+void solveWithCG(const MatrixFreeSparse& A, const std::vector<scalar>& b, std::vector<scalar>& x)
+#else
 template <typename scalar>
 void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
+#endif
 {
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> b_eig(b.size());
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> x_eig(x.size());
 
 	memcpy(b_eig.data(), b.data(), b.size()*sizeof(scalar)); 
 
+#ifdef MATRIX_FREE
+	std::cout << "Setting up the CG solver with Matrix Free Formulation" << std::endl;
+	Eigen::ConjugateGradient<MatrixFreeSparse, Eigen::Lower | Eigen::Upper, Eigen::IdentityPreconditioner> solver(A);
+#else
 	std::cout << "Setting up the CG solver with Incomplete Cholesky Preconditioner" << std::endl;
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<scalar>, Eigen::Lower, Eigen::IncompleteCholeskyPreconditioner<scalar>> solver(A);
-
+#endif
 	
 #ifdef MAX_ITER
 	solver.setMaxIterations(MAX_ITER);
 #endif
 
 	std::cout << "Starting the solver" << std::endl;
+
+	auto start = std::chrono::system_clock::now();
 	x_eig = solver.solve(b_eig);
+	auto end = std::chrono::system_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 
-	std::cout << "#iterations:     " << solver.iterations() << std::endl;
-	std::cout << "Estimated error: " << solver.error()      << std::endl;
-
+	std::cout << "Solving took:    " << duration.count() << " s" << std::endl;
+	std::cout << "#iterations:     " << solver.iterations()      << std::endl;
+	std::cout << "Estimated error: " << solver.error()           << std::endl;
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
 
+#ifdef MATRIX_FREE
+template void solveWithCG<double>(const MatrixFreeSparse& A, const std::vector<double>& b, std::vector<double>& x);
+#else
 template void solveWithCG<double>(const Eigen::SparseMatrix<double>& A, const std::vector<double>& b, std::vector<double>& x);
 template void solveWithCG<float>(const Eigen::SparseMatrix<float>& A, const std::vector<float>& b, std::vector<float>& x);
+#endif

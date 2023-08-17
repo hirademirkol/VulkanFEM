@@ -109,7 +109,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
     for (int i = 0; i < numLoads; i++)
     {
         std::getline(myfile, line, '\t');
-        uint64_t ind = std::stoull(line) - 1 - numFixed;
+        uint64_t ind = std::stoull(line) - 1;
 
         std::getline(myfile, line, '\t');
         scalar x = std::stod(line);
