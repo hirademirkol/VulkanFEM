@@ -102,17 +102,18 @@ int main()
 	getBoundaryConditions(fixedNodes, loadedNodes);
 
 
-	Eigen::SparseMatrix<double> systemMatrix = assembleSystemMatrix<double>(voxelModel, voxelModelSize, Ke, fixedNodes);
+	auto systemMatrix = assembleSystemMatrix<double>(voxelModel, voxelModelSize, Ke, fixedNodes);
+
 	uint64_t numDoF = systemMatrix.rows();
 
 	std::vector<double> f, u;
 	f.resize(numDoF, 0.0);
 	u.resize(numDoF, 0.0);
 
-	applyBoundaryConditions(f, loadedNodes);
+	applyBoundaryConditions(f, loadedNodes, fixedNodes);
 
 #ifdef CPU
-	solveWithCG(systemMatrix, f, u);
+	solveWithCG<double>(systemMatrix, f, u);
 #else
 
 	// float dt = 0.05f;
