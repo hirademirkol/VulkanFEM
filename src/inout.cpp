@@ -240,6 +240,28 @@ template void saveMatrix<double>(std::map<uint64_t, double> data, int rows, std:
 template void saveMatrix<float>(std::map<uint64_t, float> data, int rows, std::string name);
 
 template <typename T>
+void saveMatrix(std::vector<Eigen::Triplet<T>> triplets, std::string name)
+{
+	std::filesystem::path path = std::filesystem::current_path();
+    std::filesystem::path file_path = "/data/out/" + name + ".csv";
+	path += file_path;
+
+    std::ofstream myfile (path.string());
+
+    for(auto triplet : triplets)
+    {
+        myfile << triplet.row()   << ",";
+        myfile << triplet.col()   << ",";
+        myfile << triplet.value() << std::endl;
+    }
+
+    myfile.close();    
+}
+
+template void saveMatrix<double>(std::vector<Eigen::Triplet<double>> data, std::string name);
+template void saveMatrix<float>(std::vector<Eigen::Triplet<float>> data, std::string name);
+
+template <typename T>
 void printMatrix(std::vector<std::vector<T>> data)
 {
 	outMatrix(data, std::cout);

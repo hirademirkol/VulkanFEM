@@ -29,8 +29,8 @@ public:
     IsRowMajor = false,
   };
  
-  Index rows() const { return numElements; }
-  Index cols() const { return numElements; }
+  EIGEN_CONSTEXPR Index rows() const EIGEN_NOEXCEPT { return numElements; }
+  EIGEN_CONSTEXPR Index cols() const EIGEN_NOEXCEPT { return numElements; }
  
   template<typename Rhs>
   Eigen::Product<MatrixFreeSparse,Rhs,Eigen::AliasFreeProduct> operator*(const Eigen::MatrixBase<Rhs>& x) const {
@@ -49,6 +49,23 @@ public:
   const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
 	Eigen::Array<int, Eigen::Dynamic, 8> elementToNode;
   Eigen::ArrayXi fixedNodes;
+
+  //Necessary structs for Multigrid 
+  void PrepareMultigrid(int _numLevels,
+                        std::vector<Eigen::SparseMatrix<double>> _restrictionMatrices,
+                        std::vector<Eigen::SparseMatrix<double>> _interpolationMatrices,
+                        Eigen::SparseMatrix<double> _Kc)
+  {
+    numLevels = _numLevels;
+    restrictionMatrices = _restrictionMatrices;
+    interpolationMatrices = _interpolationMatrices;
+    Kc = _Kc;
+  }
+
+  int numLevels;
+  std::vector<Eigen::SparseMatrix<double>> restrictionMatrices;
+  std::vector<Eigen::SparseMatrix<double>> interpolationMatrices;
+  Eigen::SparseMatrix<double> Kc;
   
   StorageIndex numElements;
 };
