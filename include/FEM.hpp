@@ -14,11 +14,20 @@
 
 #include <Eigen/Sparse>
 
+#define MAX_ITER 500
+#define TOLERANCE 1e-6
+
 #define MATRIX_FREE
-// #define MAX_ITER 1000
 
 #ifdef MATRIX_FREE
-#include "MatrixFreeSparse.hpp"
+    #include "MatrixFreeSparse.hpp"
+
+    #define MULTIGRID
+
+    #ifdef MULTIGRID
+        #define NUM_LEVELS 3
+    #endif
+
 #endif
 
 #define index(i,j,n) (i)*(n)+(j)

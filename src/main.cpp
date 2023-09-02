@@ -263,7 +263,8 @@ int main()
 #endif
 
 	delete voxelModel;
-	
+
+	std::cout << "Saving the solution" << std::endl;
 	saveVector(u, "u");
 	// printModel(system.data(), vertexGridSize.multiplyComponents()*vertexGridSize.multiplyComponents());
 
