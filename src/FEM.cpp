@@ -82,6 +82,27 @@ inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i
 	}
 }
 
+#ifdef MULTIGRID
+
+inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<double, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> elementToNode)
+{
+	Eigen::VectorXd diag(size);
+
+	const Eigen::Array<int, 1, 24> c{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
+
+	for (auto line : elementToNode.rowwise())
+	{	
+		Eigen::Array<int, 1, 24> xs = 3 * line(xInd) + c;
+		diag(xs) += elementStiffnessMat.diagonal();
+	}
+	Eigen::VectorXd invDiag = diag.cwiseInverse();
+
+	return invDiag;
+}
+
+#endif
+
 //TODO: pass the used nodes out for applyBoundaryConditions to map global nodes to matrix nodes
 #ifdef MATRIX_FREE
 template<typename scalar>
@@ -151,10 +172,14 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	std::vector<Vec3i> levelDims;
 	std::vector<std::vector<Vec3i>> levelElements;
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
+	std::vector<std::set<uint64_t>> fixedNodesInLevels;
+	std::vector<Eigen::VectorXd> invDiagKOnLevels;
 
 	levelDims.push_back(voxelGridDimensions);
 	levelElements.push_back(usedElements);
 	usedNodesInLevels.push_back(usedNodes);
+	fixedNodesInLevels.push_back(fixedNodes);
+	invDiagKOnLevels.push_back(GetInverseDiagonal(size, elementStiffnessMatrix, elementToGlobal));
 
 	for(int i = 1; i < numLevels; i++)
 	{
@@ -211,9 +236,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 
 		std::vector<Eigen::Triplet<double>> restrtictionTriplets;
-		std::set<Vec3i> processedCoarseNodes;
 
-		
 		for(auto globalNode : nodes)
 		{
 			auto finerNode = coarseToFinerNodeMap[globalNode];
@@ -244,7 +267,46 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		auto restriction = Eigen::SparseMatrix<double>(usedNodesInLevels[i].size() * 3,usedNodesInLevels[i-1].size() * 3);
 		restriction.setFromTriplets(restrtictionTriplets.begin(), restrtictionTriplets.end());
-		auto interpolation = restriction.transpose() * 8.0;
+		auto interpolation = restriction.transpose() * pow(2, numLevels);
+
+		//Find fixed nodes on the level
+		Eigen::ArrayXi fixedNodesAbove(fixedNodesInLevels[i-1].size());
+		index = 0;
+		for(auto val : fixedNodesInLevels[i-1])
+		{
+			fixedNodesAbove[index++] = (int)val;
+		}
+
+		Eigen::VectorXd fixingForcesAbove = Eigen::VectorXd::Zero(usedNodesInLevels[i-1].size() * 3);
+
+		fixingForcesAbove(3 * fixedNodesAbove    ) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+		fixingForcesAbove(3 * fixedNodesAbove + 1) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+		fixingForcesAbove(3 * fixedNodesAbove + 2) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+
+		Eigen::VectorXd fixingForcesOnLevel = restriction * fixingForcesAbove;
+		std::set<uint64_t> fixedNodesOnLevel;
+
+		for(index = 0; index < fixingForcesOnLevel.rows(); index++)
+		{
+			int val = index % 3;
+
+			if(fixingForcesOnLevel(index) != 0.0 && (fixedNodesOnLevel.find(val) == fixedNodesOnLevel.end())) 
+				fixedNodesOnLevel.insert(val);
+		}
+		fixedNodesInLevels.push_back(fixedNodesOnLevel);
+
+		int levelSize = usedNodesInLevel.size() * 3;
+		Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobalOnLevel(levelElements[i].size(), 8);
+		line = 0;
+		for (auto element : levelElements[i])
+		{
+			FOR3(node, Vec3i(0), Vec3i(2))
+			{
+				elementToGlobalOnLevel(line, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(element + node, levelDims[i] + Vec3i(1))];
+			}
+			line++;
+		}
+		invDiagKOnLevels.push_back(GetInverseDiagonal(levelSize, pow(0.5, 2*i) * elementStiffnessMatrix, elementToGlobalOnLevel));
 
 
 		// if(i == 1)
@@ -264,21 +326,45 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
-	int Ksize = usedNodesInLevels[numLevels - 1].size() * 3;
+	std::map<uint64_t, uint64_t> freeNodes;
+	std::vector<uint64_t> freeIndices;
+	index = 1; 
+	uint64_t expectedIndex = 0;
+	for (auto line : usedNodesInLevels[numLevels - 1])
+	{
+		if(fixedNodesInLevels[numLevels - 1].find(expectedIndex) == fixedNodesInLevels[numLevels - 1].end())
+		{
+			freeNodes[line.first] = index++;
+			freeIndices.push_back(expectedIndex);
+		}
+
+		expectedIndex++;
+	}
+	
+	Eigen::ArrayXi freeDoFsOnCoarsest(freeNodes.size() * 3);
+	index = 0;
+	for(auto val : freeIndices)
+	{
+		freeDoFsOnCoarsest[index++] = 3 * (int)val;
+		freeDoFsOnCoarsest[index++] = 3 * (int)val + 1;
+		freeDoFsOnCoarsest[index++] = 3 * (int)val + 2;
+	}
+
+	int Ksize = freeNodes.size() * 3;
 	std::vector<std::array<uint64_t, 8>> elementToGlobalCoarsest;
 	for (auto element : levelElements[numLevels - 1])
 	{
 		std::array<uint64_t, 8> nodes;
 		FOR3(node, Vec3i(0), Vec3i(2))
 		{
-			nodes[Linearize(node, Vec3i(2))] = usedNodesInLevels[numLevels - 1][Linearize(element + node, levelDims[numLevels - 1] + Vec3i(1))];
+			nodes[Linearize(node, Vec3i(2))] = freeNodes[Linearize(element + node, levelDims[numLevels - 1] + Vec3i(1))] - 1;
 		}
 		elementToGlobalCoarsest.push_back(nodes);
 	}
 
 	auto Kc = assembleK<double>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(0.5, 2*(numLevels - 1)));
 
-	systemMatrix.PrepareMultigrid(numLevels, restrictionMatrices, interpolationMatrices, Kc);
+	systemMatrix.PrepareMultigrid(numLevels, restrictionMatrices, interpolationMatrices, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
 
 #else // MATRIX_FREE

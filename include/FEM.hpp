@@ -14,7 +14,7 @@
 
 #include <Eigen/Sparse>
 
-#define MAX_ITER 500
+// #define MAX_ITER 1500
 #define TOLERANCE 1e-6
 
 #define MATRIX_FREE
