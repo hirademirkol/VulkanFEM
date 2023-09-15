@@ -9,6 +9,8 @@
 #include <map>
 #include <vector>
 
+#include <Eigen/Sparse>
+
 template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name = "matrix");
 
@@ -20,6 +22,9 @@ void saveMatrix(std::vector<std::array<T,l>> data, std::string name = "matrix");
 
 template <typename T>
 void saveMatrix(std::map<uint64_t, T> data, int rows, std::string name = "matrix");
+
+template <typename T>
+void saveMatrix(std::vector<Eigen::Triplet<T>> triplets, std::string name);
 
 template <typename T>
 void printMatrix(std::vector<std::vector<T>> data);

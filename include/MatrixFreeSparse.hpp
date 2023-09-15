@@ -29,8 +29,8 @@ public:
     IsRowMajor = false,
   };
  
-  Index rows() const { return numElements; }
-  Index cols() const { return numElements; }
+  EIGEN_CONSTEXPR Index rows() const EIGEN_NOEXCEPT { return numElements; }
+  EIGEN_CONSTEXPR Index cols() const EIGEN_NOEXCEPT { return numElements; }
  
   template<typename Rhs>
   Eigen::Product<MatrixFreeSparse,Rhs,Eigen::AliasFreeProduct> operator*(const Eigen::MatrixBase<Rhs>& x) const {
@@ -49,6 +49,29 @@ public:
   const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
 	Eigen::Array<int, Eigen::Dynamic, 8> elementToNode;
   Eigen::ArrayXi fixedNodes;
+
+  //Necessary structs for Multigrid 
+  void PrepareMultigrid(int _numLevels,
+                        std::vector<Eigen::SparseMatrix<double>> _restrictionMatrices,
+                        std::vector<Eigen::SparseMatrix<double>> _interpolationMatrices,
+                        std::vector<Eigen::VectorXd> _invDiagKOnLevels,
+                        Eigen::SparseMatrix<double> _Kc,
+                        Eigen::ArrayXi _coarseFreeDoFs)
+  {
+    numLevels = _numLevels;
+    restrictionMatrices = _restrictionMatrices;
+    interpolationMatrices = _interpolationMatrices;
+    invDiagKOnLevels = _invDiagKOnLevels;
+    Kc = _Kc;
+    coarseFreeDoFs = _coarseFreeDoFs;
+  }
+
+  int numLevels;
+  std::vector<Eigen::SparseMatrix<double>> restrictionMatrices;
+  std::vector<Eigen::SparseMatrix<double>> interpolationMatrices;
+  std::vector<Eigen::VectorXd> invDiagKOnLevels;
+  Eigen::SparseMatrix<double> Kc;
+  Eigen::ArrayXi coarseFreeDoFs;
   
   StorageIndex numElements;
 };
@@ -66,18 +89,13 @@ namespace internal {
     template<typename Dest>
     static void scaleAndAddTo(Dest& dst, const MatrixFreeSparse& lhs, const Rhs& rhs, const Scalar& alpha)
     {
-      // This method should implement "dst += alpha * lhs * rhs" inplace,
-      // however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
-      assert(alpha==Scalar(1) && "scaling is not implemented");
-      EIGEN_ONLY_USED_FOR_DEBUG(alpha);
- 
       const Array<int, 1, 24> c   {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
       const Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
 
       for(auto line : lhs.elementToNode.rowwise())
       {
         Array<int, 1, 24> xs = 3 * line(xInd) + c;
-        dst(xs) += lhs.elementStiffnessMat * rhs(xs);
+        dst(xs) += alpha * lhs.elementStiffnessMat * rhs(xs);
       }
 
       dst(3 * lhs.fixedNodes    ) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
