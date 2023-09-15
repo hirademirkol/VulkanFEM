@@ -103,4 +103,25 @@ inline static int PackPosition(Vec3i vi)
 
 #pragma endregion
 
+namespace std
+{
+	template <>
+	struct hash<Vec3i>
+	{
+		std::size_t operator()(const Vec3i& k) const
+		{
+			return std::hash<int>()(Linearize(k, Vec3i(k.MAX+1)));
+		}
+	};
+
+	template<>
+	struct less<Vec3i>
+	{
+		bool operator()(const Vec3i& lhs, const Vec3i& rhs) const
+		{
+			return Linearize(lhs, Vec3i(lhs.MAX+1)) < Linearize(rhs, Vec3i(rhs.MAX+1));
+		}
+	};
+} // namespace std
+
 #endif // __UTILS_HPP__
