@@ -10,12 +10,12 @@
 
 #include "utils.hpp"
 
-int* loadVoxel(int &sizeX, int &sizeY, int &sizeZ);
+int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ);
 
 template <typename scalar>
 void getKe(scalar Ke[24][24]);
 
 template <typename scalar>
-void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes);
+void getBoundaryConditions(std::string& model_name, std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes);
 
 #endif // __IN_HPP__

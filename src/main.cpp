@@ -23,12 +23,19 @@ using TensorTypes = kp::Tensor::TensorTypes;
 #include "Ke.h"
 #include "FEM.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
 	Vec3i voxelModelSize; // Number of elements on each axis
 	Vec3d elementSize = Vec3d(1e-3); //m
 
-	int* voxelModel = loadVoxel(voxelModelSize.x, voxelModelSize.y, voxelModelSize.z);
+	if(argc < 2)
+	{
+		std::cout << "An input file is necessary" << std::endl;
+		return EXIT_FAILURE;
+	}
+	std::string fileName(argv[1]);
+	std::string modelName = fileName.substr(0, fileName.find('.', 1));
+	int* voxelModel = loadVoxel(modelName, voxelModelSize.x, voxelModelSize.y, voxelModelSize.z);
 
 	double Ke[24][24];
 	// ComputeKe(elementSize.x, elementSize.y, elementSize.z, 2e9, 0.394, Ke);
@@ -99,7 +106,7 @@ int main()
 
 	std::set<uint64_t> fixedNodes;
 	std::map<uint64_t, Vec3d> loadedNodes;
-	getBoundaryConditions(fixedNodes, loadedNodes);
+	getBoundaryConditions(modelName, fixedNodes, loadedNodes);
 
 
 	auto systemMatrix = assembleSystemMatrix<double>(voxelModel, voxelModelSize, Ke, fixedNodes);
@@ -265,7 +272,7 @@ int main()
 	delete voxelModel;
 
 	std::cout << "Saving the solution" << std::endl;
-	saveVector(u, "u");
+	saveVector(u, modelName);
 	// printModel(system.data(), vertexGridSize.multiplyComponents()*vertexGridSize.multiplyComponents());
 
 	return EXIT_SUCCESS;
