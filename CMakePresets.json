@@ -32,6 +32,11 @@
             "configuration": "Release"
         },
         {
+            "name": "Windows RelWithDebInfo",
+            "configurePreset": "Windows",
+            "configuration": "RelWithDebInfo"
+        },
+        {
             "name": "Linux Debug",
             "configurePreset": "Linux",
             "configuration": "Debug"
@@ -40,6 +45,11 @@
             "name": "Linux Release",
             "configurePreset": "Linux",
             "configuration": "Release"
+        },
+        {
+            "name": "Linux RelWithDebInfo",
+            "configurePreset": "Linux",
+            "configuration": "RelWithDebInfo"
         }
     ]
 }

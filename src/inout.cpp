@@ -4,11 +4,11 @@
 #pragma region input
 
 
-int* loadVoxel(int &sizeX, int &sizeY, int &sizeZ)
+int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/voxelizedModel.bin";
+    std::filesystem::path file_path = "/" + model_name + ".dat";
     path += file_path;
     
     std::ifstream myfile (path.string());
@@ -74,13 +74,13 @@ template void getKe<double>(double Ke[24][24]);
 template void getKe<float>(float Ke[24][24]);
 
 template <typename scalar>
-void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
+void getBoundaryConditions(std::string& model_name, std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes)
 {
     std::string line;
     
     //fixing conditions
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/fixed.dat";
+    std::filesystem::path file_path = "/" + model_name + "_fixed.dat";
     path += file_path;
 
     std::ifstream myfile (path.string());
@@ -98,7 +98,7 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
 
     //loading conditions
     path = std::filesystem::current_path();
-    file_path = "/data/loading.dat";
+    file_path = "/" + model_name + "_loading.dat";
     path += file_path;
 
     myfile.open(path.string());
@@ -126,8 +126,8 @@ void getBoundaryConditions(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Ve
     myfile.close();
 }
 
-template void getBoundaryConditions<double>(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<double>>& loadedNodes);
-template void getBoundaryConditions<float>(std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<float>>& loadedNodes);
+template void getBoundaryConditions<double>(std::string& model_name, std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<double>>& loadedNodes);
+template void getBoundaryConditions<float>(std::string& model_name, std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<float>>& loadedNodes);
 
 #pragma endregion input
 
@@ -199,7 +199,7 @@ template <typename T>
 void saveVector(std::vector<T> data, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/out/" + name + ".csv";
+    std::filesystem::path file_path = "/" + name + "_out.csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
