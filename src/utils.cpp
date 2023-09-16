@@ -26,3 +26,8 @@ Vec3i operator-(Vec3i first, Vec3i second)
 	result.z = first.z - second.z;
 	return result;
 }
+
+bool operator<(Vec3i first, Vec3i second)
+{
+	return Linearize(first, Vec3i(first.MAX+1)) < Linearize(second, Vec3i(second.MAX+1));
+}

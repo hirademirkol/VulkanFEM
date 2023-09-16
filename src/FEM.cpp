@@ -267,7 +267,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		auto restriction = Eigen::SparseMatrix<double>(usedNodesInLevels[i].size() * 3,usedNodesInLevels[i-1].size() * 3);
 		restriction.setFromTriplets(restrtictionTriplets.begin(), restrtictionTriplets.end());
-		auto interpolation = restriction.transpose() * pow(2, numLevels);
+		auto interpolation = restriction.transpose() * 8;
 
 		//Find fixed nodes on the level
 		Eigen::ArrayXi fixedNodesAbove(fixedNodesInLevels[i-1].size());

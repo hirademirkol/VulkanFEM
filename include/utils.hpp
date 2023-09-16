@@ -78,6 +78,7 @@ typedef Vec3<double> Vec3d;
 Vec3d operator*(Vec3i first, Vec3d second);
 Vec3i operator+(Vec3i first, Vec3i second);
 Vec3i operator-(Vec3i first, Vec3i second);
+bool operator<(Vec3i first, Vec3i second);
 
 #pragma region // TODO: Change these
 template <typename T>
@@ -111,15 +112,6 @@ namespace std
 		std::size_t operator()(const Vec3i& k) const
 		{
 			return std::hash<int>()(Linearize(k, Vec3i(k.MAX+1)));
-		}
-	};
-
-	template<>
-	struct less<Vec3i>
-	{
-		bool operator()(const Vec3i& lhs, const Vec3i& rhs) const
-		{
-			return Linearize(lhs, Vec3i(lhs.MAX+1)) < Linearize(rhs, Vec3i(rhs.MAX+1));
 		}
 	};
 } // namespace std
