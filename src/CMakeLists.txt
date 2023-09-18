@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.24)
 
 add_executable(${CMAKE_PROJECT_NAME} main.cpp FEM.cpp Ke.cpp inout.cpp utils.cpp)
 
