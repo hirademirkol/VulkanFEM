@@ -174,6 +174,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
 	std::vector<std::set<uint64_t>> fixedNodesInLevels;
 	std::vector<Eigen::VectorXd> invDiagKOnLevels;
+  	std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> elementToNodeMatrices;
+  	std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
+	std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> restrictionCoefficients;
 
 	levelDims.push_back(voxelGridDimensions);
 	levelElements.push_back(usedElements);
@@ -195,10 +198,6 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			int x = finerElement.x / 2;
 			int y = finerElement.y / 2;
 			int z = finerElement.z / 2;
-
-			int dx = finerElement.x % 2;
-			int dy = finerElement.y % 2;
-			int dz = finerElement.z % 2;
 
 			elements.insert(Vec3i(x,y,z));
 		}
@@ -297,15 +296,38 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		int levelSize = usedNodesInLevel.size() * 3;
 		Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobalOnLevel(levelElements[i].size(), 8);
+		Eigen::Array<int, Eigen::Dynamic, 27> restrictionMapping(levelElements[i].size(), 27);
+		Eigen::VectorXd restrictionCoeffVector = Eigen::VectorXd::Zero(3 * usedNodesInLevels[i - 1].size());
 		line = 0;
 		for (auto element : levelElements[i])
 		{
+			int restrictionCoeff = 0;
 			FOR3(node, Vec3i(0), Vec3i(2))
 			{
-				elementToGlobalOnLevel(line, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(element + node, levelDims[i] + Vec3i(1))];
+				elementToGlobalOnLevel(line, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(element + node, nodeDims)];
+
 			}
+
+			FOR3(node, Vec3i(0), Vec3i(3))
+			{
+				auto val = Linearize(coarseToFinerNodeMap[element] + node, finerNodeDims);
+				if(usedNodesInLevels[i - 1].contains(val))
+				{
+					restrictionMapping(line, Linearize(node, Vec3i(3))) = (int)usedNodesInLevels[i - 1][val];
+					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val]    )++;
+					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 1)++;
+					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 2)++;
+				}
+				else
+					restrictionMapping(line, Linearize(node, Vec3i(3))) = -1;
+			
+			}
+
 			line++;
 		}
+		elementToNodeMatrices.push_back(elementToGlobalOnLevel);
+		restrictionMappings.push_back(restrictionMapping);
+		restrictionCoefficients.push_back(restrictionCoeffVector.cwiseInverse());
 		invDiagKOnLevels.push_back(GetInverseDiagonal(levelSize, pow(0.5, 2*i) * elementStiffnessMatrix, elementToGlobalOnLevel));
 
 
@@ -364,7 +386,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	auto Kc = assembleK<double>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(0.5, 2*(numLevels - 1)));
 
-	systemMatrix.PrepareMultigrid(numLevels, restrictionMatrices, interpolationMatrices, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
+	systemMatrix.PrepareMultigrid(numLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, interpolationMatrices, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
 
 #else // MATRIX_FREE
