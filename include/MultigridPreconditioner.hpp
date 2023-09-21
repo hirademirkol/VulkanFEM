@@ -4,6 +4,8 @@
 #include "FEM.hpp"
 #include <Eigen/SparseCholesky>
 
+#include <out.hpp>
+
 namespace Eigen
 {
 	class MultigridPreconditioner
@@ -39,16 +41,33 @@ namespace Eigen
 			numLevels = mat.numLevels;
 			ldltSolver.compute(mat.Kc);
 
-			restrictionOperator << 	0, 0.5000, 1.0000, 0, 0.2500, 0.5000, 0, 0, 0, 0, 0.2500, 0.5000, 0, 0.1250, 0.2500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-									0, 0, 0, 0, 0.2500, 0.5000, 0, 0.5000, 1.0000, 0, 0, 0, 0, 0.1250, 0.2500, 0, 0.2500, 0.5000, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-									0, 0, 0,0.5000, 0.2500, 0, 1.0000, 0.5000, 0, 0, 0, 0, 0.2500, 0.1250, 0, 0.5000, 0.2500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-									1.0000, 0.5000, 0, 0.5000, 0.2500, 0, 0, 0, 0, 0.5000, 0.2500, 0, 0.2500, 0.1250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-									0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2500, 0.5000, 0, 0.1250, 0.2500, 0, 0, 0, 0, 0.5000, 1.0000, 0, 0.2500, 0.5000, 0, 0, 0,
-									0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1250, 0.2500, 0, 0.2500, 0.5000, 0, 0, 0, 0, 0.2500, 0.5000, 0, 0.5000, 1.0000,
-									0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2500, 0.1250, 0, 0.5000, 0.2500, 0, 0, 0, 0, 0.5000, 0.2500, 0, 1.0000, 0.5000, 0,
-									0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5000, 0.2500, 0, 0.2500, 0.1250, 0, 0, 0, 0, 1.0000, 0.5000, 0, 0.5000, 0.2500, 0, 0, 0, 0;
-
-
+			restrictionOperator << 	1.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+									0.500, 0.500, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+									0.000, 1.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+									0.500, 0.000, 0.500, 0.000, 0.000, 0.000, 0.000, 0.000,
+									0.250, 0.250, 0.250, 0.250, 0.000, 0.000, 0.000, 0.000,
+									0.000, 0.500, 0.000, 0.500, 0.000, 0.000, 0.000, 0.000,
+									0.000, 0.000, 1.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+									0.000, 0.000, 0.500, 0.500, 0.000, 0.000, 0.000, 0.000,
+									0.000, 0.000, 0.000, 1.000, 0.000, 0.000, 0.000, 0.000,
+									0.500, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000,
+									0.250, 0.250, 0.000, 0.000, 0.250, 0.250, 0.000, 0.000,
+									0.000, 0.500, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000,
+									0.250, 0.000, 0.250, 0.000, 0.250, 0.000, 0.250, 0.000,
+									0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125,
+									0.000, 0.250, 0.000, 0.250, 0.000, 0.250, 0.000, 0.250,
+									0.000, 0.000, 0.500, 0.000, 0.000, 0.000, 0.500, 0.000,
+									0.000, 0.000, 0.250, 0.250, 0.000, 0.000, 0.250, 0.250,
+									0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000, 0.500,
+									0.000, 0.000, 0.000, 0.000, 1.000, 0.000, 0.000, 0.000,
+									0.000, 0.000, 0.000, 0.000, 0.500, 0.500, 0.000, 0.000,
+									0.000, 0.000, 0.000, 0.000, 0.000, 1.000, 0.000, 0.000,
+									0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.500, 0.000,
+									0.000, 0.000, 0.000, 0.000, 0.250, 0.250, 0.250, 0.250,
+									0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.500,
+									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.000, 0.000,
+									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.500,
+									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.000;
 
 			m_isInitialized = true;
 			return *this;
@@ -67,21 +86,15 @@ namespace Eigen
 
 		inline Vector restrict(const Vector &x, int level) const
 		{
-			// return matrix->restrictionMatrices[level] * x;
-
 			Vector result = Vector::Zero(matrix->invDiagKOnLevels[level + 1].rows());
 			Vector tempX = x.cwiseProduct(matrix->restrictionCoefficients[level]);
-      		// const Array<int, 1, 24> c   {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
-      		// const Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
 
 			int num = 0;
 			for(auto line : matrix->elementToNodeMatrices[level].rowwise())
 			{
-				// Array<int, 1, 24> xs = 3 * line(xInd) + c;
 				Array<int, 27, 1> mapping = matrix->restrictionMappings[level].row(num);
-				// Matrix<double, 8, 1> res = restrictionOperator * x(mapping);
 				Matrix<double, 27, 1> mask = Matrix<double, 27, 1>::Ones(mapping.rows());
-				
+
 				for(int i = 0; i < 27; i++)
 					if(mapping(i) == -1)
 					{
@@ -91,20 +104,45 @@ namespace Eigen
 
 				for(int c = 0; c < 3; c++)
 				{
-					// Matrix<double, 27, 1> temp = tempX(3 * mapping + c);
-					// temp = temp.cwiseProduct(mask);
-					result(3 * line + c) += restrictionOperator *  tempX(3 * mapping + c).cwiseProduct(mask);
+					result(3 * line + c) += tempX(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 				}
 
 				num++;
 			}
-
 			return result;
 		}
 
 		inline Vector interpolate(const Vector &x, int level) const
 		{
-			return matrix->interpolationMatrices[level] * x;
+			Vector temp = Vector::Zero(matrix->invDiagKOnLevels[level].rows() + 3);
+			int overRow = matrix->invDiagKOnLevels[level].rows() / 3;
+			double zero = 0;
+
+			int num = 0;
+			for(auto line : matrix->elementToNodeMatrices[level].rowwise())
+			{
+				Array<int, 27, 1> mapping = matrix->restrictionMappings[level].row(num);
+
+				for(int i = 0; i < 27; i++)
+				{
+					if(mapping(i) == -1)
+					{
+						mapping(i) = overRow;
+					}
+				}
+
+				for(int c = 0; c < 3; c++)
+				{
+					temp(3 * mapping + c) += restrictionOperator *  x(3 * line + c);
+				}
+
+				num++;
+			}
+
+			Vector result(temp.rows() - 3);
+			std::copy(temp.begin(), temp.end() - 3, result.begin());
+
+			return result.cwiseProduct(matrix->restrictionCoefficients[level]);
 		}
 
 		/** \internal */
@@ -156,7 +194,7 @@ namespace Eigen
 
 		bool m_isInitialized;
 
-		Matrix<double, 8, 27> restrictionOperator;
+		Matrix<double, 27, 8> restrictionOperator;
 	};
 }
 
