@@ -166,9 +166,6 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	//Prepare multigrid related matrices
 	int numLevels = NUM_LEVELS;
-	std::vector<Eigen::SparseMatrix<double>> restrictionMatrices;
-	std::vector<Eigen::SparseMatrix<double>> interpolationMatrices;
-
 	std::vector<Vec3i> levelDims;
 	std::vector<std::vector<Vec3i>> levelElements;
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
@@ -305,7 +302,6 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			FOR3(node, Vec3i(0), Vec3i(2))
 			{
 				elementToGlobalOnLevel(line, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(element + node, nodeDims)];
-
 			}
 
 			FOR3(node, Vec3i(0), Vec3i(3))
@@ -329,16 +325,6 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		restrictionMappings.push_back(restrictionMapping);
 		restrictionCoefficients.push_back(restrictionCoeffVector.cwiseInverse());
 		invDiagKOnLevels.push_back(GetInverseDiagonal(levelSize, pow(0.5, 2*i) * elementStiffnessMatrix, elementToGlobalOnLevel));
-
-
-		// if(i == 1)
-		// 	saveMatrix(restrtictionTriplets, "restriction1");
-		// if(i == 2)
-		// 	saveMatrix(restrtictionTriplets, "restriction2");
-
-
-		restrictionMatrices.push_back(restriction);
-		interpolationMatrices.push_back(interpolation);
 
 		if(newLevelDims.x <= 2 || newLevelDims.y <= 2 || newLevelDims.z <= 2)
 		{
@@ -386,7 +372,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	auto Kc = assembleK<double>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(0.5, 2*(numLevels - 1)));
 
-	systemMatrix.PrepareMultigrid(numLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, interpolationMatrices, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
+	systemMatrix.PrepareMultigrid(numLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
 
 #else // MATRIX_FREE

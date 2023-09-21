@@ -182,7 +182,7 @@ template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/out/" + name + ".txt";
+    std::filesystem::path file_path = "/" + name + "_out.csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -223,7 +223,7 @@ template <typename T>
 void saveMatrix(std::map<uint64_t, T> data, int rows, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/out/" + name + ".csv";
+    std::filesystem::path file_path = "/" + name + "_out.csv";
 	path += file_path;
     
     std::ofstream myfile (path.string());
@@ -243,7 +243,7 @@ template <typename T>
 void saveMatrix(std::vector<Eigen::Triplet<T>> triplets, std::string name)
 {
 	std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/out/" + name + ".csv";
+    std::filesystem::path file_path = "/" + name + "_out.csv";
 	path += file_path;
 
     std::ofstream myfile (path.string());
@@ -260,6 +260,30 @@ void saveMatrix(std::vector<Eigen::Triplet<T>> triplets, std::string name)
 
 template void saveMatrix<double>(std::vector<Eigen::Triplet<double>> data, std::string name);
 template void saveMatrix<float>(std::vector<Eigen::Triplet<float>> data, std::string name);
+
+template <typename T, int i, int j>
+void saveArray(Eigen::Array<T, i, j> array, std::string name)
+{
+    std::filesystem::path path = std::filesystem::current_path();
+    std::filesystem::path file_path = "/" + name + "_out.csv";
+	path += file_path;
+
+    std::ofstream myfile (path.string());
+
+    for(int x = 0; x < array.rows(); x++)
+    {
+        for(int y = 0; y < array.cols(); y++)
+        {
+            myfile << array(x,y) << ",";
+        }
+        myfile << std::endl;
+    }
+
+    myfile.close(); 
+}
+
+template void saveArray<int, -1, 8>(Eigen::Array<int, -1, 8> array, std::string name);
+template void saveArray<int, -1, 27>(Eigen::Array<int, -1, 27> array, std::string name);
 
 template <typename T>
 void printMatrix(std::vector<std::vector<T>> data)

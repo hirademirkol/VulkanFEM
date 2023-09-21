@@ -55,7 +55,6 @@ public:
                         std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> _elementToNodeMatrices,
                         std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> _restrictionMappings,
                         std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> _restrictionCoefficients,
-                        std::vector<Eigen::SparseMatrix<double>> _interpolationMatrices,
                         std::vector<Eigen::VectorXd> _invDiagKOnLevels,
                         Eigen::SparseMatrix<double> _Kc,
                         Eigen::ArrayXi _coarseFreeDoFs)
@@ -64,7 +63,6 @@ public:
     elementToNodeMatrices = _elementToNodeMatrices;
     restrictionMappings = _restrictionMappings;
     restrictionCoefficients = _restrictionCoefficients;
-    interpolationMatrices = _interpolationMatrices;
     invDiagKOnLevels = _invDiagKOnLevels;
     Kc = _Kc;
     coarseFreeDoFs = _coarseFreeDoFs;
@@ -74,7 +72,6 @@ public:
   std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> elementToNodeMatrices;
   std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
   std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> restrictionCoefficients;
-  std::vector<Eigen::SparseMatrix<double>> interpolationMatrices;
   std::vector<Eigen::VectorXd> invDiagKOnLevels;
   Eigen::SparseMatrix<double> Kc;
   Eigen::ArrayXi coarseFreeDoFs;
