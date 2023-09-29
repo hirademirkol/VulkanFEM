@@ -1,0 +1,18 @@
+#version 450
+
+#define index gl_GlobalInvocationID.x
+
+layout(binding = 0) buffer pBuffer { double p[]; };
+layout(binding = 1) buffer AtpBuffer { double Atp[]; };
+layout(binding = 2) buffer rBuffer { double r[]; };
+layout(binding = 3) buffer uBuffer { double u[]; };
+layout(binding = 4) buffer norm2Buffer{ double norm2; };
+layout(binding = 5) buffer dotPBuffer { double dotP; };
+
+void main()
+{
+    double alpha = norm2/dotP;
+    u[index] += alpha * p[index];
+    r[index] -= alpha * Atp[index];
+    // dotP = alpha;
+}

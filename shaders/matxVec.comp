@@ -2,22 +2,27 @@
 
 #extension GL_EXT_shader_atomic_float: enable
 
-layout (constant_id = 0) const int numDoF = 0;
-layout (constant_id = 1) const int numIndices = 0;
-
-// The execution structure
-layout (local_size_x = 1) in;
+#define indexElement gl_WorkGroupID.x
+#define indexX gl_WorkGroupID.y
+#define indexY gl_WorkGroupID.z
 
 // The buffers are provided via the tensors
-layout(binding = 0) buffer bufIndices { uint indices[]; };
-layout(binding = 1) buffer bufValues { double values[]; };
+layout(binding = 0) buffer bufElementStiffness { double elementStiffness[24][24]; };
+layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][8]; };
 layout(binding = 2) buffer bufp { double p[]; };
-layout(binding = 3) buffer bufap { double ap[]; };
+layout(binding = 3) buffer bufAtp { double Atp[]; };
 
 void main() {
-    const uint index = indices[gl_GlobalInvocationID.x];
-    const uint i = index / numDoF;
-    const uint j = index % numDoF;
-    ap[i] = 1;
-    atomicAdd(ap[i], values[gl_GlobalInvocationID.x] * p[j]);
+    const int dof1Index = elementToGlobal[indexElement][indexX];
+    const int dof2Index = elementToGlobal[indexElement][indexY];
+
+    for(int i = 0; i < 3; i++)
+    {
+        // atomicExchange(Atp[3*dof1Index + i], indexElement);
+        for(int j = 0; j < 3; j++)
+        {
+            atomicAdd(Atp[3 * dof1Index + i], elementStiffness[3 * indexX + i][3 * indexY + j] * p[3 * dof2Index + j]);
+        }
+    }
+    // elementToGlobal[indexElement][indexX] = int(indexX);
 }

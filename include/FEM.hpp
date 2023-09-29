@@ -14,7 +14,7 @@
 
 #include <Eigen/Sparse>
 
-// #define MAX_ITER 500
+// #define MAX_ITER 1000
 #define TOLERANCE 1e-6
 
 #define MATRIX_FREE
@@ -22,7 +22,7 @@
 #ifdef MATRIX_FREE
     #include "MatrixFreeSparse.hpp"
 
-    #define MULTIGRID
+    // #define MULTIGRID
 
     #ifdef MULTIGRID
         #define NUM_LEVELS 3

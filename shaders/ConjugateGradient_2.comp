@@ -1,0 +1,15 @@
+#version 450
+
+#extension GL_EXT_shader_atomic_float: enable
+
+#define index gl_GlobalInvocationID.x
+
+layout(binding = 0) buffer pBuffer { double p[]; };
+layout(binding = 1) buffer rBuffer { double r[]; };
+layout(binding = 2) buffer norm1Buffer { double norm1; };
+layout(binding = 3) buffer norm2Buffer{ double norm2; };
+
+void main()
+{
+    p[index] = r[index] + norm2/norm1 * p[index];
+}

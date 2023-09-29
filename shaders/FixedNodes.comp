@@ -1,0 +1,13 @@
+#version 450
+
+#define index gl_GlobalInvocationID.x
+
+layout(binding = 0) buffer xBuffer { double x[]; };
+layout(binding = 1) buffer fixedNodeBuffer { int fixedNodes[]; };
+
+void main()
+{
+    x[3 * fixedNodes[index]    ] = 0;
+    x[3 * fixedNodes[index] + 1] = 0;
+    x[3 * fixedNodes[index] + 2] = 0;
+}
