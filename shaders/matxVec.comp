@@ -7,10 +7,10 @@
 #define indexY gl_WorkGroupID.z
 
 // The buffers are provided via the tensors
-layout(binding = 0) buffer bufElementStiffness { double elementStiffness[24][24]; };
+layout(binding = 0) buffer bufElementStiffness { float elementStiffness[24][24]; };
 layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][8]; };
-layout(binding = 2) buffer bufp { double p[]; };
-layout(binding = 3) buffer bufAtp { double Atp[]; };
+layout(binding = 2) buffer bufp { float p[]; };
+layout(binding = 3) buffer bufAtp { float Atp[]; };
 
 void main() {
     const int dof1Index = elementToGlobal[indexElement][indexX];

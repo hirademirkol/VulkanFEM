@@ -106,7 +106,7 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<double, 24, 24
 //TODO: pass the used nodes out for applyBoundaryConditions to map global nodes to matrix nodes
 #ifdef MATRIX_FREE
 template<typename scalar>
-MatrixFreeSparse assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
+MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
 #else
 template<typename scalar>
 Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
@@ -143,7 +143,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
 	for(int i = 0; i < 24; i++)
 	{
-		elementStiffnessMatrix(i,i) = elementStiffness[i][i];
+		elementStiffnessMatrix(i,i) = (scalar)elementStiffness[i][i];
 		for(int j = 0; j < i ; j++)
 		{
 			elementStiffnessMatrix(i,j) = elementStiffness[j][i];
@@ -158,7 +158,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	{
 		fixed[index++] = (int)val;
 	}
-	MatrixFreeSparse systemMatrix(size, elementStiffnessMatrix, elementToGlobal, fixed);
+	MatrixFreeSparse<scalar> systemMatrix(size, elementStiffnessMatrix, elementToGlobal, fixed);
 
 	#ifdef MULTIGRID
 
@@ -410,7 +410,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 }
 
 #ifdef MATRIX_FREE
-template MatrixFreeSparse assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+template MatrixFreeSparse<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 #else
 template Eigen::SparseMatrix<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, float elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
@@ -437,7 +438,7 @@ template void applyBoundaryConditions<float>(std::vector<float>& f, std::map<uin
 
 #ifdef MATRIX_FREE
 template <typename scalar>
-void solveWithCG(const MatrixFreeSparse& A, const std::vector<scalar>& b, std::vector<scalar>& x)
+void solveWithCG(const MatrixFreeSparse<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
 #else
 template <typename scalar>
 void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
@@ -454,7 +455,7 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 	Eigen::ConjugateGradient<MatrixFreeSparse, Eigen::Lower | Eigen::Upper, Eigen::MultigridPreconditioner> solver(A);
 	#else
 	std::cout << "Setting up the CG solver with Matrix Free Formulation" << std::endl;
-	Eigen::ConjugateGradient<MatrixFreeSparse, Eigen::Lower | Eigen::Upper, Eigen::IdentityPreconditioner> solver(A);
+	Eigen::ConjugateGradient<MatrixFreeSparse<scalar>, Eigen::Lower | Eigen::Upper, Eigen::IdentityPreconditioner> solver(A);
 	#endif
 #else
 	std::cout << "Setting up the CG solver with Incomplete Cholesky Preconditioner" << std::endl;
@@ -484,7 +485,8 @@ void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>
 }
 
 #ifdef MATRIX_FREE
-template void solveWithCG<double>(const MatrixFreeSparse& A, const std::vector<double>& b, std::vector<double>& x);
+template void solveWithCG<double>(const MatrixFreeSparse<double>& A, const std::vector<double>& b, std::vector<double>& x);
+template void solveWithCG<float>(const MatrixFreeSparse<float>& A, const std::vector<float>& b, std::vector<float>& x);
 #else
 template void solveWithCG<double>(const Eigen::SparseMatrix<double>& A, const std::vector<double>& b, std::vector<double>& x);
 template void solveWithCG<float>(const Eigen::SparseMatrix<float>& A, const std::vector<float>& b, std::vector<float>& x);

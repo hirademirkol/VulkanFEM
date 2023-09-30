@@ -4,9 +4,9 @@
 
 #define index gl_GlobalInvocationID.x
 
-layout(binding = 0) buffer x1Buffer { double x1[]; };
-layout(binding = 1) buffer x2Buffer { double x2[]; };
-layout(binding = 2) buffer normBuffer { double result; };
+layout(binding = 0) buffer x1Buffer { float x1[]; };
+layout(binding = 1) buffer x2Buffer { float x2[]; };
+layout(binding = 2) buffer normBuffer { float result; };
 
 void main()
 {
