@@ -161,8 +161,7 @@ int main(int argc, char* argv[])
 					  ->record<kp::OpAlgoDispatch>(algoMatxVec)
 					  ->record<kp::OpAlgoDispatch>(algoFixedNodes)
 					  ->record<kp::OpAlgoDispatch>(algoVecDotVec)
-					  ->record<kp::OpAlgoDispatch>(algoCG_1)
-				  	  ->record<kp::OpTensorSyncLocal>({AtpTensor, dotPTensor, elementToGlobalTensor});
+					  ->record<kp::OpAlgoDispatch>(algoCG_1);
 
 	std::shared_ptr<kp::Sequence> seq2 =
 		mgr.sequence()->record<kp::OpTensorSyncDevice>({norm1Tensor, norm2Tensor})
@@ -170,20 +169,19 @@ int main(int argc, char* argv[])
 				  	  ->record<kp::OpTensorSyncLocal>({norm2Tensor});
 
 	std::shared_ptr<kp::Sequence> seq3 =
-		mgr.sequence()->record<kp::OpAlgoDispatch>(algoCG_2)
-					  ->record<kp::OpTensorSyncLocal>({pTensor});
+		mgr.sequence()->record<kp::OpAlgoDispatch>(algoCG_2);
 
 
 #ifdef MAX_ITER
 	int maxIterations = MAX_ITER;
 #else
-	int maxIterations = 4000;
+	int maxIterations = 10000;
 #endif
 
 #ifdef TOLERANCE
 	double tolerance = TOLERANCE;
 #else
-	double tolerance = 1e-6;
+	double tolerance = 1e-16;
 #endif
 
 	double threshold = tolerance * tolerance * *norm2;
@@ -194,15 +192,19 @@ int main(int argc, char* argv[])
 	auto start = std::chrono::system_clock::now();
 	for(iter = 0; iter < maxIterations; iter++)
 	{
-		memcpy(AtpTensor->data<double>(), Atp.data(), Atp.size()*sizeof(double));
+		memset((void*)AtpTensor->data<double>(), 0, Atp.size()*sizeof(double));
 		*dotPTensor->data<double>() = 0.0;
+
 		seq1->eval();
 
 		*norm1Tensor->data<double>() = *norm2Tensor->data<double>();
 		*norm2Tensor->data<double>() = 0.0;
 
 		seq2->eval();
-		// std::cout << "Iteration: "<< i <<", Norm: " << (*norm2Tensor->data<double>()) << std::endl;
+
+		if(iter%100 == 0)
+			std::cout << "Iteration: "<< iter <<", Norm: " << (*norm2Tensor->data<double>()) << std::endl;
+
 		if(*norm2Tensor->data<double>() < threshold)
 		{
 			break;

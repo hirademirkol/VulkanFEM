@@ -3,6 +3,7 @@ project(Master)
 
 set(CMAKE_CXX_STANDARD 20)
 
+set(KOMPUTE_OPT_LOG_LEVEL "Warn")
 add_subdirectory(external/kompute ${CMAKE_CURRENT_BINARY_DIR}/kompute_build)
 list(APPEND CMAKE_PREFIX_PATH "${kompute_SOURCE_DIR}/cmake")
 include_directories(external/kompute/src/include)
