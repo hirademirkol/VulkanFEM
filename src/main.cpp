@@ -2,6 +2,13 @@
 #include <vector>
 #include <chrono>
 
+#include "utils.hpp"
+#include "in.hpp"
+#include "out.hpp"
+
+#include "Ke.h"
+#include "FEM.hpp"
+
 // #define CPU
 
 #ifndef CPU
@@ -18,14 +25,14 @@
 typedef std::shared_ptr<kp::Tensor> Tensor;
 using TensorDataTypes = kp::Tensor::TensorDataTypes;
 using TensorTypes = kp::Tensor::TensorTypes;
+
+#define real float
+
+#else
+
+#define real float //or double
+
 #endif
-
-#include "utils.hpp"
-#include "in.hpp"
-#include "out.hpp"
-
-#include "Ke.h"
-#include "FEM.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -46,54 +53,56 @@ int main(int argc, char* argv[])
 	getKe(Ke);
 
 	std::set<uint64_t> fixedNodes;
-	std::map<uint64_t, Vec3d> loadedNodes;
+	std::map<uint64_t, Vec3<real>> loadedNodes;
 	getBoundaryConditions(modelName, fixedNodes, loadedNodes);
 
-	auto systemMatrix = assembleSystemMatrix<double>(voxelModel, voxelModelSize, Ke, fixedNodes);
+#ifndef MATRIX_FREE
+	SparseMatrix<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
+#else
+	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
+#endif
 
 	uint64_t numDoF = systemMatrix.rows();
 
-	std::vector<double> f, u;
+	std::vector<real> f, u;
 	f.resize(numDoF, 0.0);
 	u.resize(numDoF, 0.0);
 
 	applyBoundaryConditions(f, loadedNodes, fixedNodes);
 
 #ifdef CPU
-	solveWithCG<double>(systemMatrix, f, u);
+	solveWithCG<real>(systemMatrix, f, u);
 #else
 
-	std::vector<double> r(f);
-	std::vector<double> p(f);
-	std::vector<double> Atp;
+	std::vector<real> r(f);
+	std::vector<real> p(f);
+	std::vector<real> Atp;
 	Atp.resize(numDoF, 0.0);
 
 	// Setting Kompute
 	kp::Manager mgr(0, {}, { "VK_EXT_shader_atomic_float" });
 
-	// double *norm1, *norm2, *dotP, *zero;
-
-	double *norm1 = new double(0.0);
-	double *norm2 = new double(0.0);
-	double *dotP = new double(0.0);
-	double *zero = new double(0.0);
+	real *norm1 = new real(0.0);
+	real *norm2 = new real(0.0);
+	real *dotP = new real(0.0);
+	real *zero = new real(0.0);
 
 	for(int i = 0; i < numDoF; i++)
 		*norm2 += r[i] * r[i];
 
 	Eigen::Array<int, 8, Eigen::Dynamic> elementToNodeArray = systemMatrix.elementToNode.transpose();
 
-	Tensor elementStiffnessTensor = mgr.tensor((void*)systemMatrix.elementStiffnessMat.data(), 24*24, sizeof(double), TensorDataTypes::eDouble);
+	Tensor elementStiffnessTensor = mgr.tensor((void*)systemMatrix.elementStiffnessMat.data(), 24*24, sizeof(real), TensorDataTypes::eFloat);
 	Tensor elementToGlobalTensor = mgr.tensor((void*)elementToNodeArray.data(), systemMatrix.elementToNode.rows()*8, sizeof(int), TensorDataTypes::eInt);
 	Tensor fixedNodesTensor = mgr.tensor((void*)systemMatrix.fixedNodes.data(), systemMatrix.fixedNodes.rows(), sizeof(int), TensorDataTypes::eInt);
-	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor rTensor = mgr.tensor((void*)r.data(), (uint64_t)numDoF, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor uTensor = mgr.tensor((void*)u.data(), (uint64_t)numDoF, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor norm2Tensor = mgr.tensor((void*)norm2, 1, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor zeroTensor = mgr.tensor((void*)zero, 1, sizeof(double), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor rTensor = mgr.tensor((void*)r.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor uTensor = mgr.tensor((void*)u.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor norm2Tensor = mgr.tensor((void*)norm2, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor zeroTensor = mgr.tensor((void*)zero, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
 
 
 	const std::vector<Tensor> paramsMatxVec = {elementStiffnessTensor,
@@ -125,7 +134,6 @@ int main(int argc, char* argv[])
 										  norm2Tensor};
 
 
-	// const kp::Workgroup perElementDoFWorkgroup({(uint32_t)systemMatrix.elementToNode.rows(), 24, 24});
 	const kp::Workgroup perElementDoFWorkgroup({(uint32_t)systemMatrix.elementToNode.rows(), 8, 8});
 	const kp::Workgroup perFixedNodeWorkgroup({(uint32_t)systemMatrix.fixedNodes.rows(), 1, 1});
 	const kp::Workgroup perDoFWorkgroup({(uint32_t)numDoF, 1, 1});
@@ -179,12 +187,12 @@ int main(int argc, char* argv[])
 #endif
 
 #ifdef TOLERANCE
-	double tolerance = TOLERANCE;
+	real tolerance = TOLERANCE;
 #else
-	double tolerance = 1e-16;
+	real tolerance = 1e-16;
 #endif
 
-	double threshold = tolerance * tolerance * *norm2;
+	real threshold = tolerance * tolerance * *norm2;
 
 	std::cout << "Starting the GPU Solver" << std::endl;
 
@@ -192,20 +200,20 @@ int main(int argc, char* argv[])
 	auto start = std::chrono::system_clock::now();
 	for(iter = 0; iter < maxIterations; iter++)
 	{
-		memset((void*)AtpTensor->data<double>(), 0, Atp.size()*sizeof(double));
-		*dotPTensor->data<double>() = 0.0;
+		memset((void*)AtpTensor->data<real>(), 0, Atp.size()*sizeof(real));
+		*dotPTensor->data<real>() = 0.0;
 
 		seq1->eval();
 
-		*norm1Tensor->data<double>() = *norm2Tensor->data<double>();
-		*norm2Tensor->data<double>() = 0.0;
+		*norm1Tensor->data<real>() = *norm2Tensor->data<real>();
+		*norm2Tensor->data<real>() = 0.0;
 
 		seq2->eval();
 
 		if(iter%100 == 0)
-			std::cout << "Iteration: "<< iter <<", Norm: " << (*norm2Tensor->data<double>()) << std::endl;
+			std::cout << "Iteration: "<< iter <<", Norm: " << (*norm2Tensor->data<real>()) << std::endl;
 
-		if(*norm2Tensor->data<double>() < threshold)
+		if(*norm2Tensor->data<real>() < threshold)
 		{
 			break;
 		}
@@ -217,10 +225,10 @@ int main(int argc, char* argv[])
 	
 	std::cout << "Solving took:    " << duration.count() << " s" 					<< std::endl;
 	std::cout << "#iterations:     " << iter	    								<< std::endl;
-	std::cout << "Estimated error: " << sqrt(*norm2Tensor->data<double>() / *norm2)	<< std::endl;
+	std::cout << "Estimated error: " << sqrt(*norm2Tensor->data<real>() / *norm2)	<< std::endl;
 
 	mgr.sequence()->eval<kp::OpTensorSyncLocal>({uTensor});
-	u = uTensor->vector<double>();
+	u = uTensor->vector<real>();
 	delete norm2, dotP;
 
 #endif
