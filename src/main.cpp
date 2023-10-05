@@ -26,11 +26,11 @@ typedef std::shared_ptr<kp::Tensor> Tensor;
 using TensorDataTypes = kp::Tensor::TensorDataTypes;
 using TensorTypes = kp::Tensor::TensorTypes;
 
-#define real float
+#define real double
 
 #else
 
-#define real float //or double
+#define real double //or float
 
 #endif
 
@@ -92,17 +92,17 @@ int main(int argc, char* argv[])
 
 	Eigen::Array<int, 8, Eigen::Dynamic> elementToNodeArray = systemMatrix.elementToNode.transpose();
 
-	Tensor elementStiffnessTensor = mgr.tensor((void*)systemMatrix.elementStiffnessMat.data(), 24*24, sizeof(real), TensorDataTypes::eFloat);
+	Tensor elementStiffnessTensor = mgr.tensor((void*)systemMatrix.elementStiffnessMat.data(), 24*24, sizeof(real), TensorDataTypes::eDouble);
 	Tensor elementToGlobalTensor = mgr.tensor((void*)elementToNodeArray.data(), systemMatrix.elementToNode.rows()*8, sizeof(int), TensorDataTypes::eInt);
 	Tensor fixedNodesTensor = mgr.tensor((void*)systemMatrix.fixedNodes.data(), systemMatrix.fixedNodes.rows(), sizeof(int), TensorDataTypes::eInt);
-	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor rTensor = mgr.tensor((void*)r.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor uTensor = mgr.tensor((void*)u.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor norm2Tensor = mgr.tensor((void*)norm2, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
-	Tensor zeroTensor = mgr.tensor((void*)zero, 1, sizeof(real), TensorDataTypes::eFloat, TensorTypes::eDevice);
+	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor rTensor = mgr.tensor((void*)r.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor uTensor = mgr.tensor((void*)u.data(), (uint64_t)numDoF, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor norm2Tensor = mgr.tensor((void*)norm2, 1, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor zeroTensor = mgr.tensor((void*)zero, 1, sizeof(real), TensorDataTypes::eDouble, TensorTypes::eDevice);
 
 
 	const std::vector<Tensor> paramsMatxVec = {elementStiffnessTensor,
@@ -134,9 +134,9 @@ int main(int argc, char* argv[])
 										  norm2Tensor};
 
 
-	const kp::Workgroup perElementDoFWorkgroup({(uint32_t)systemMatrix.elementToNode.rows(), 8, 8});
-	const kp::Workgroup perFixedNodeWorkgroup({(uint32_t)systemMatrix.fixedNodes.rows(), 1, 1});
-	const kp::Workgroup perDoFWorkgroup({(uint32_t)numDoF, 1, 1});
+	const kp::Workgroup perElementWorkgroup({(uint32_t)systemMatrix.elementToNode.rows(), 1, 1});
+	const kp::Workgroup perFixedNodeWorkgroup({(uint32_t)systemMatrix.fixedNodes.rows()/64 + 1, 1, 1});
+	const kp::Workgroup perDoFWorkgroup({(uint32_t)numDoF/64 + 1, 1, 1});
 
 	const std::vector<uint32_t> MatxVecShader = std::vector<uint32_t>(
 		shaders::MATXVEC_COMP_SPV.begin(),	shaders::MATXVEC_COMP_SPV.end());
@@ -153,7 +153,7 @@ int main(int argc, char* argv[])
 	const std::vector<uint32_t> CGShader_2 = std::vector<uint32_t>(
 		shaders::CONJUGATEGRADIENT_2_COMP_SPV.begin(),	shaders::CONJUGATEGRADIENT_2_COMP_SPV.end());
 
-	std::shared_ptr<kp::Algorithm> algoMatxVec = mgr.algorithm(paramsMatxVec, MatxVecShader, perElementDoFWorkgroup);
+	std::shared_ptr<kp::Algorithm> algoMatxVec = mgr.algorithm(paramsMatxVec, MatxVecShader, perElementWorkgroup);
 	std::shared_ptr<kp::Algorithm> algoFixedNodes = mgr.algorithm(paramsFixedNodes, FixedNodesShader, perFixedNodeWorkgroup);
 	std::shared_ptr<kp::Algorithm> algoVecDotVec = mgr.algorithm(paramsVecDotVec, VecDotVecShader, perDoFWorkgroup);
 	std::shared_ptr<kp::Algorithm> algoVecNorm = mgr.algorithm(paramsVecNorm, VecDotVecShader, perDoFWorkgroup);
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
 #ifdef MAX_ITER
 	int maxIterations = MAX_ITER;
 #else
-	int maxIterations = 10000;
+	int maxIterations = 30000;
 #endif
 
 #ifdef TOLERANCE

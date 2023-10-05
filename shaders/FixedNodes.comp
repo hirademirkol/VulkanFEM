@@ -2,7 +2,11 @@
 
 #define index gl_GlobalInvocationID.x
 
-layout(binding = 0) buffer xBuffer { float x[]; };
+#define real double
+
+layout (local_size_x = 64) in;
+
+layout(binding = 0) buffer xBuffer { real x[]; };
 layout(binding = 1) buffer fixedNodeBuffer { int fixedNodes[]; };
 
 void main()

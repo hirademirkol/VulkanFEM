@@ -1,0 +1,13 @@
+diff --git a/cmake/vulkan_shader_compiler.cmake b/cmake/vulkan_shader_compiler.cmake
+index acc27b5..8b20d66 100644
+--- a/cmake/vulkan_shader_compiler.cmake
++++ b/cmake/vulkan_shader_compiler.cmake
+@@ -19,6 +19,8 @@ function(vulkan_compile_shader)
+                         COMMAND "${GLS_LANG_VALIDATOR_PATH}"
+                         ARGS "-V"
+                              "${SHADER_COMPILE_INFILE_FULL}"
++                             "--target-env"
++                             "spirv1.3"
+                              "-o"
+                              "${SHADER_COMPILE_SPV_FILE_FULL}"
+                         COMMENT "Compile vulkan compute shader from file '${SHADER_COMPILE_INFILE_FULL}' to '${SHADER_COMPILE_SPV_FILE_FULL}'."
