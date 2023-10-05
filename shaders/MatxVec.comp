@@ -3,14 +3,18 @@
 #extension GL_EXT_shader_atomic_float: enable
 
 #define indexElement gl_WorkGroupID.x
-#define indexX gl_WorkGroupID.y
-#define indexY gl_WorkGroupID.z
+#define indexX gl_LocalInvocationID.x
+#define indexY gl_LocalInvocationID.y
+
+#define real double
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 // The buffers are provided via the tensors
-layout(binding = 0) buffer bufElementStiffness { float elementStiffness[24][24]; };
+layout(binding = 0) buffer bufElementStiffness { real elementStiffness[24][24]; };
 layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][8]; };
-layout(binding = 2) buffer bufp { float p[]; };
-layout(binding = 3) buffer bufAtp { float Atp[]; };
+layout(binding = 2) buffer bufp { real p[]; };
+layout(binding = 3) buffer bufAtp { real Atp[]; };
 
 void main() {
     const int dof1Index = elementToGlobal[indexElement][indexX];
