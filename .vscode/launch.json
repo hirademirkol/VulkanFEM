@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Linux/src/Master",
-            "args": [],
+            "args": ["data/parts.dat"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/Linux/src/",
             "environment": [],

@@ -161,6 +161,7 @@ int main(int argc, char* argv[])
 	std::shared_ptr<kp::Algorithm> algoCG_2 = mgr.algorithm(paramsCG_2, CGShader_2, perDoFWorkgroup);
 
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsMatxVec);
+	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsFixedNodes);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_1);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_2);
 
