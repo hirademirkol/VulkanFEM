@@ -1,0 +1,32 @@
+#version 450
+
+#extension GL_EXT_shader_atomic_float: enable
+
+#define indexElement gl_WorkGroupID.x
+#define indexMapperNode gl_LocalInvocationID.x
+#define indexNode gl_LocalInvocationID.y
+
+#define real double
+
+layout (local_size_x = 27, local_size_y = 8, local_size_z = 1) in;
+
+// The buffers are provided via the tensors
+layout(binding = 0) buffer bufrestrictionOperator { real restrictionOperator[27][8]; };
+layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][8]; };
+layout(binding = 2) buffer bufrestrictionMapping { int restrictionMapping[][27]; };
+layout(binding = 3) buffer buftempX { real tempX[]; };
+layout(binding = 4) buffer bufresult { real result[]; };
+
+void main() {
+    const int elementNode = elementToGlobal[indexElement][indexNode];
+    int surroundingNode = restrictionMapping[indexElement][indexMapperNode];
+
+    const int mask = (surroundingNode == -1) ? 0 : 1;
+    surroundingNode = (surroundingNode == -1) ? 0 : surroundingNode;
+
+    for(int i = 0; i < 3; i++)
+    {
+        atomicAdd(result[3 * elementNode + i], mask * tempX[3 * surroundingNode + i] * restrictionOperator[indexMapperNode][indexNode]);
+        // result[3*elementNode + i] = restrictionOperator[4][0];
+    }
+}

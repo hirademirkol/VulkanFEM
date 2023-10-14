@@ -14,21 +14,7 @@
 
 #include <Eigen/Sparse>
 
-// #define MAX_ITER 5000
-#define TOLERANCE 1e-6
-
-#define MATRIX_FREE
-
-#ifdef MATRIX_FREE
-    #include "MatrixFreeSparse.hpp"
-
-    // #define MULTIGRID
-
-    #ifdef MULTIGRID
-        #define NUM_LEVELS 3
-    #endif
-
-#endif
+#include "FEMDefines.hpp"
 
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
@@ -47,10 +33,10 @@ void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<sca
 
 #ifdef MATRIX_FREE
 template<typename scalar>
-void solveWithCG(const MatrixFreeSparse<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
+void solveWithEigen(const MatrixFreeSparse<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
 #else
 template <typename scalar>
-void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
+void solveWithEigen(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
 #endif
 
 #endif // __FEM_HPP__
