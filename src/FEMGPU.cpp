@@ -9,7 +9,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 {
     uint64_t numDoF = f.size();
 
-	uint64_t memoryUsage;
+	uint64_t memoryUsage = 0;
 
     std::vector<scalar> r(f);
 	std::vector<scalar> p(f);
@@ -171,7 +171,9 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	auto resultTensor = mgr.tensor((void*)result.data(), systemMatrix.invDiagKOnLevels[0].rows(), sizeof(double), TensorDataTypes::eDouble);
 	resultTensors.push_back(resultTensor);
 
-	for(int i = 1; i < NUM_LEVELS; i++)
+	int numLevels = systemMatrix.numLevels;
+
+	for(int i = 1; i < numLevels; i++)
 	{
 		Eigen::Array<int, 8, Eigen::Dynamic> matrix = systemMatrix.elementToNodeMatrices[i - 1].transpose();
 		auto elementToNodeTensor = mgr.tensor((void*)matrix.data(), matrix.cols()*8, sizeof(int), TensorDataTypes::eInt);
@@ -342,26 +344,26 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 #ifdef MULTIGRID
 	//Preconditioning for first update direction
 	{
-		for(int i = 0; i < NUM_LEVELS - 1; i++)
+		for(int i = 0; i < numLevels - 1; i++)
 		{
 			memset((void*)resultTensors[i]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i].rows()*sizeof(scalar));
 			memset((void*)rTensors[i + 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i + 1].rows()*sizeof(scalar));
 			seqRestricts[i]->eval();
 		}
 
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[numLevels - 1]});
 
-		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[NUM_LEVELS - 1]->data<scalar>(), rTensors[NUM_LEVELS - 1]->vector<scalar>().size());
+		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[numLevels - 1]->data<scalar>(), rTensors[numLevels - 1]->vector<scalar>().size());
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector2 = Eigen::Matrix<scalar, Eigen::Dynamic, 1>::Zero(vector1.rows());
 
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> solution = ldltSolver.solve(vector1(systemMatrix.coarseFreeDoFs));
 		vector2(systemMatrix.coarseFreeDoFs) = solution;
 
-		memcpy((void*)resultTensors[NUM_LEVELS - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
+		memcpy((void*)resultTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
 
-		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[NUM_LEVELS - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[numLevels - 1]});
 
-		for (int i = NUM_LEVELS - 1; i > 0; i--)
+		for (int i = numLevels - 1; i > 0; i--)
 		{
 			memset((void*)tempTensors[i - 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i - 1].rows()*sizeof(scalar));
 			seqInterpolates[i - 1]->eval();
@@ -401,28 +403,28 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		}
 #ifdef MULTIGRID
 
-		for(int i = 0; i < NUM_LEVELS - 1; i++)
+		for(int i = 0; i < numLevels - 1; i++)
 		{
 			memset((void*)resultTensors[i]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i].rows()*sizeof(scalar));
 			memset((void*)rTensors[i + 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i + 1].rows()*sizeof(scalar));
 			seqRestricts[i]->eval();
 		}
 
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[numLevels - 1]});
 
-		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[NUM_LEVELS - 1]->data<scalar>(), rTensors[NUM_LEVELS - 1]->vector<scalar>().size());
+		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[numLevels - 1]->data<scalar>(), rTensors[numLevels - 1]->vector<scalar>().size());
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector2 = Eigen::Matrix<scalar, Eigen::Dynamic, 1>::Zero(vector1.rows());
 
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> solution = ldltSolver.solve(vector1(systemMatrix.coarseFreeDoFs));
 		vector2(systemMatrix.coarseFreeDoFs) = solution;
 
-		memcpy((void*)resultTensors[NUM_LEVELS - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
+		memcpy((void*)resultTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
 
-		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[NUM_LEVELS - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[numLevels - 1]});
 
 		*norm2Tensor->data<scalar>() = 0.0;
 
-		for (int i = NUM_LEVELS - 1; i > 0; i--)
+		for (int i = numLevels - 1; i > 0; i--)
 		{
 			memset((void*)tempTensors[i - 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i - 1].rows()*sizeof(scalar));
 			seqInterpolates[i - 1]->eval();

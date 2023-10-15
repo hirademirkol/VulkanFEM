@@ -38,6 +38,16 @@ int main(int argc, char* argv[])
 	std::string modelName = fileName.substr(0, fileName.find('.', 1));
 	int* voxelModel = loadVoxel(modelName, voxelModelSize.x, voxelModelSize.y, voxelModelSize.z);
 
+#ifdef MULTIGRID
+	int numLevels = 3;
+	if(argc > 2)
+	{
+		if(std::string(argv[2]) == "-n") numLevels = std::stoi(argv[3]);
+	}
+	std::cout << "Number of levels for Multigrid: " << numLevels << std::endl;
+#endif
+
+
 	double Ke[24][24];
 	// ComputeKe(elementSize.x, elementSize.y, elementSize.z, 2e9, 0.394, Ke);
 	getKe(Ke);
@@ -49,7 +59,11 @@ int main(int argc, char* argv[])
 #ifndef MATRIX_FREE
 	SparseMatrix<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
 #else
+	#ifndef MULTIGRID
 	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
+	#else
+	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes, numLevels);
+	#endif
 #endif
 
 	uint64_t numDoF = systemMatrix.rows();

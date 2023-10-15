@@ -105,8 +105,13 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 #endif
 
 #ifdef MATRIX_FREE
+	#ifdef MULTIGRID
+template<typename scalar>
+MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels)
+    #else
 template<typename scalar>
 MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
+	#endif
 #else
 //TODO: pass the used nodes out for applyBoundaryConditions to map global nodes to matrix nodes
 template<typename scalar>
@@ -166,7 +171,6 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	std::cout << "Preparing the Multigrid structure" << std::endl;
 
 	//Prepare multigrid related matrices
-	int numLevels = NUM_LEVELS;
 	std::vector<Vec3i> levelDims;
 	std::vector<std::vector<Vec3i>> levelElements;
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
@@ -411,8 +415,12 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 }
 
 #ifdef MATRIX_FREE
+	#ifdef MULTIGRID
+template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels);
+	#else
 template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 // template MatrixFreeSparse<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+	#endif
 #else
 template Eigen::SparseMatrix<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, float elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);

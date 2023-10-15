@@ -5,11 +5,5 @@
 
 #ifdef MATRIX_FREE
     #include "MatrixFreeSparse.hpp"
-
     #define MULTIGRID
-
-    #ifdef MULTIGRID
-        #define NUM_LEVELS 3
-    #endif
-
 #endif
