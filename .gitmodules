@@ -3,5 +3,5 @@
 	url = https://github.com/KomputeProject/kompute
 [submodule "external/eigen"]
 	path = external/eigen
-	url = D:/Master/Code/external/eigen
-	branch = master
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = 3.4.0
