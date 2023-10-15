@@ -215,19 +215,13 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		const std::vector<Tensor> paramsCWiseAdd = { tempTensors[i - 1],
 													resultTensors[i - 1],
 													resultTensors[i - 1]};
-
-		const std::vector<Tensor> paramsSmooth2 = { resultTensors[i - 1],
-													rTensors[i - 1],
-													invDiagKOnLevelTensors[i - 1]};
-
 												  
-		const kp::Workgroup perElementOnLevelWorkgroup({(uint32_t)matrix.cols(), 1, 1});//TODO:Different for interpolate?
+		const kp::Workgroup perElementOnLevelWorkgroup({(uint32_t)matrix.cols(), 1, 1});
 		const kp::Workgroup perDoFOnLevelWorkgroup({(uint32_t)systemMatrix.invDiagKOnLevels[i - 1].rows()/64 + 1, 1, 1});
 
 		Algorithm algoRestrict = mgr.algorithm(paramsRestrict, RestrictShader, perElementOnLevelWorkgroup);
 		Algorithm algoInterpolate = mgr.algorithm(paramsInterpolate, InterpolateShader, perElementOnLevelWorkgroup);
 		Algorithm algoSmooth = mgr.algorithm(paramsSmooth, SmoothShader, perDoFOnLevelWorkgroup);
-		Algorithm algoSmooth2 = mgr.algorithm(paramsSmooth2, SmoothShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseMult = mgr.algorithm(paramsCWiseMult, CWiseMultShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseMult2 = mgr.algorithm(paramsCWiseMult2, CWiseMultShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseAdd = mgr.algorithm(paramsCWiseAdd, CWiseAddShader, perDoFOnLevelWorkgroup);
@@ -237,7 +231,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 						  ->record<kp::OpAlgoDispatch>(algoSmooth)
 						  ->record<kp::OpAlgoDispatch>(algoCWiseMult)
 						  ->record<kp::OpAlgoDispatch>(algoRestrict);
-						//   ->record<kp::OpTensorSyncLocal>({rTensorOnLevelBelow});//TODO:Remove
 
 						  
 		auto seqInterpolate = 
@@ -245,7 +238,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 						  ->record<kp::OpAlgoDispatch>(algoInterpolate)
 						  ->record<kp::OpAlgoDispatch>(algoCWiseMult2)
 						  ->record<kp::OpAlgoDispatch>(algoCWiseAdd)
-						  ->record<kp::OpAlgoDispatch>(algoSmooth2);
+						  ->record<kp::OpAlgoDispatch>(algoSmooth);
 
 		seqRestricts.push_back(seqRestrict);
 		seqInterpolates.push_back(seqInterpolate);
@@ -287,7 +280,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 #endif
 
-
 #ifdef MAX_ITER
 	int maxIterations = MAX_ITER;
 #else
@@ -302,6 +294,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 	scalar threshold = tolerance * tolerance * *norm2;
 
+	int iter;
+	std::cout << "Starting the GPU Solver" << std::endl;
+	auto start = std::chrono::system_clock::now();
+
 #ifdef MULTIGRID
 	//Preconditioning for first update direction
 	{
@@ -312,7 +308,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 			seqRestricts[i]->eval();
 		}
 
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1], tempTensors[0]});
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1]});
 
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[NUM_LEVELS - 1]->data<scalar>(), rTensors[NUM_LEVELS - 1]->vector<scalar>().size());
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector2 = Eigen::Matrix<scalar, Eigen::Dynamic, 1>::Zero(vector1.rows());
@@ -328,7 +324,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		{
 			memset((void*)tempTensors[i - 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i - 1].rows()*sizeof(scalar));
 			seqInterpolates[i - 1]->eval();
-			// mgr.sequence()->eval<kp::OpTensorSyncLocal>({resultTensors[i-1]});
 		}
 
 		*norm2Tensor->data<scalar>() = 0.0;
@@ -344,19 +339,12 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	}
 #endif
 
-	std::cout << "Starting the GPU Solver" << std::endl;
-
-	int iter;
-	auto start = std::chrono::system_clock::now();
 	for(iter = 0; iter < maxIterations; iter++)
 	{
 		memset((void*)AtpTensor->data<scalar>(), 0, Atp.size()*sizeof(scalar));
 		*dotPTensor->data<scalar>() = 0.0;
 
 		seqXUpdate->eval();
-
-		
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({dotPTensor});
 
 		*norm1Tensor->data<scalar>() = *norm2Tensor->data<scalar>();
 		*norm2Tensor->data<scalar>() = 0.0;
@@ -379,7 +367,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 			seqRestricts[i]->eval();
 		}
 
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1], tempTensors[0]});
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({rTensors[NUM_LEVELS - 1]});
 
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector1 = Eigen::Map<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> (rTensors[NUM_LEVELS - 1]->data<scalar>(), rTensors[NUM_LEVELS - 1]->vector<scalar>().size());
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> vector2 = Eigen::Matrix<scalar, Eigen::Dynamic, 1>::Zero(vector1.rows());
@@ -397,12 +385,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		{
 			memset((void*)tempTensors[i - 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i - 1].rows()*sizeof(scalar));
 			seqInterpolates[i - 1]->eval();
-			// mgr.sequence()->eval<kp::OpTensorSyncLocal>({resultTensors[i-1]});
 		}
 
 		seqPUpdateWithZ->eval();
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({norm1Tensor, norm2Tensor});
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({pTensor});
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({norm2Tensor});
 
 #else
 		seqPUpdate->eval();

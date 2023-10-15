@@ -22,11 +22,9 @@ void main() {
 
     for(int i = 0; i < 3; i++)
     {
-        // atomicExchange(Atp[3*dof1Index + i], indexElement);
         for(int j = 0; j < 3; j++)
         {
             atomicAdd(Atp[3 * dof1Index + i], elementStiffness[3 * indexX + i][3 * indexY + j] * p[3 * dof2Index + j]);
         }
     }
-    // elementToGlobal[indexElement][indexX] = int(indexX);
 }
