@@ -9,6 +9,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 {
     uint64_t numDoF = f.size();
 
+	uint64_t memoryUsage;
+
     std::vector<scalar> r(f);
 	std::vector<scalar> p(f);
 	std::vector<scalar> Atp;
@@ -36,6 +38,17 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor norm2Tensor = mgr.tensor((void*)norm2, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
+
+	memoryUsage += elementStiffnessTensor->size() * sizeof(scalar);
+	memoryUsage += elementToGlobalTensor->size() * sizeof(int);
+	memoryUsage += fixedNodesTensor->size() * sizeof(int);
+	memoryUsage += pTensor->size() * sizeof(scalar);
+	memoryUsage += AtpTensor->size() * sizeof(scalar);
+	memoryUsage += rTensor->size() * sizeof(scalar);
+	memoryUsage += uTensor->size() * sizeof(scalar);
+	memoryUsage += norm1Tensor->size() * sizeof(scalar);
+	memoryUsage += norm2Tensor->size() * sizeof(scalar);
+	memoryUsage += dotPTensor->size() * sizeof(scalar);
 
 	const std::vector<Tensor> paramsMatxVec = {elementStiffnessTensor,
 											   elementToGlobalTensor,
@@ -254,6 +267,32 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(tempTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(resultTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor});
+
+	for( auto tensor : elementToNodeTensors)
+		memoryUsage += tensor->size()*sizeof(int);
+
+	for( auto tensor : restrictionMappingTensors)
+		memoryUsage += tensor->size()*sizeof(int);
+
+	for( auto tensor : restrictionCoefficientTensors)
+		memoryUsage += tensor->size()*sizeof(scalar);
+
+	for( auto tensor : invDiagKOnLevelTensors)
+		memoryUsage += tensor->size()*sizeof(scalar);
+
+	for( auto tensor : rTensors)
+		memoryUsage += tensor->size()*sizeof(scalar);
+
+	for( auto tensor : tempTensors)
+		memoryUsage += tensor->size()*sizeof(scalar);
+
+	for( auto tensor : resultTensors)
+		memoryUsage += tensor->size()*sizeof(scalar);
+
+	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
+	memoryUsage -= rTensor->size()*sizeof(scalar); // Double counted above
+
+	std::cout << "\tData assigned GPU memory: " << (double)memoryUsage/1024/1024 << " MB" << std::endl;
 
 	const std::vector<Tensor> paramsFixedNodesZ = { resultTensors[0],
 											  fixedNodesTensor};

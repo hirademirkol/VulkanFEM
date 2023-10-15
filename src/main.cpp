@@ -54,6 +54,10 @@ int main(int argc, char* argv[])
 
 	uint64_t numDoF = systemMatrix.rows();
 
+	std::cout << "System statistics:" << std::endl;
+	std::cout << "\tVoxel model resolution: " << voxelModelSize.x << " x " << voxelModelSize.y << " x " << voxelModelSize.z << std::endl;
+	std::cout << "\tDegrees of freedom: " << numDoF << std::endl;
+
 	std::vector<real> f, u;
 	f.resize(numDoF, 0.0);
 	u.resize(numDoF, 0.0);
