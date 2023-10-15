@@ -80,29 +80,13 @@ Vec3i operator+(Vec3i first, Vec3i second);
 Vec3i operator-(Vec3i first, Vec3i second);
 bool operator<(Vec3i first, Vec3i second);
 
-#pragma region // TODO: Change these
-template <typename T>
-inline Vec3<T> Vectorize(const T &s, const T &base)
-{
-	return Vec3<T>(s % base, (s % (base * base)) / base, s / (base * base));
-}
 template <class T>
 inline T Linearize(const Vec3<T> &v, const Vec3<T> &size) { return v.x + v.y * size.x + v.z * (size.x * size.y); }
 
-#define FOR3(vi, vi0, vi1)											\
+#define FOR3(vi, vi0, vi1)								  \
 	for ((vi).z = (vi0).z; (vi).z < (vi1).z; (vi).z++)    \
 		for ((vi).y = (vi0).y; (vi).y < (vi1).y; (vi).y++)\
 			for ((vi).x = (vi0).x; (vi).x < (vi1).x; (vi).x++)
-
-#define N_BITS_X 11
-#define N_BITS_Y 11
-#define N_BITS_Z 10
-inline static int PackPosition(Vec3i vi)
-{
-	return vi.x | (vi.y << N_BITS_X) | (vi.z << (N_BITS_X + N_BITS_Y));
-}
-
-#pragma endregion
 
 namespace std
 {
