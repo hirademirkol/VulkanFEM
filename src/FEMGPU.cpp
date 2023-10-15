@@ -2,6 +2,7 @@
 #include "RestrictionOperator.hpp"
 
 #include <iostream>
+#include <chrono>
 
 template< typename scalar>
 void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::vector<scalar>& f, std::vector<scalar>& u)
@@ -226,8 +227,9 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		Algorithm algoCWiseMult2 = mgr.algorithm(paramsCWiseMult2, CWiseMultShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseAdd = mgr.algorithm(paramsCWiseAdd, CWiseAddShader, perDoFOnLevelWorkgroup);
 
+		std::vector<Tensor> syncTensors = {resultTensors[i - 1], rTensorOnLevelBelow};
 		auto seqRestrict = 
-			mgr.sequence()->record<kp::OpTensorSyncDevice>({resultTensors[i - 1], rTensorOnLevelBelow})
+			mgr.sequence()->record<kp::OpTensorSyncDevice>(syncTensors)
 						  ->record<kp::OpAlgoDispatch>(algoSmooth)
 						  ->record<kp::OpAlgoDispatch>(algoCWiseMult)
 						  ->record<kp::OpAlgoDispatch>(algoRestrict);
