@@ -16,11 +16,6 @@ vulkan_compile_shader(INFILE VecDotVec.comp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
-vulkan_compile_shader(INFILE GaussSeidel.comp
-    OUTFILE GaussSeidel.hpp
-    NAMESPACE "shaders"
-    RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
-
 vulkan_compile_shader(INFILE ConjugateGradient_1.comp
     OUTFILE ConjugateGradient_1.hpp
     NAMESPACE "shaders"
@@ -60,7 +55,6 @@ vulkan_compile_shader(INFILE Interpolate.comp
 add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/FixedNodes.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/VecDotVec.hpp" 
-                              "${CMAKE_CURRENT_BINARY_DIR}/GaussSeidel.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/ConjugateGradient_1.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/ConjugateGradient_2.hpp"
                               "${CMAKE_CURRENT_BINARY_DIR}/CWiseMult.hpp" 

@@ -104,11 +104,11 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 
 #endif
 
-//TODO: pass the used nodes out for applyBoundaryConditions to map global nodes to matrix nodes
 #ifdef MATRIX_FREE
 template<typename scalar>
 MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
 #else
+//TODO: pass the used nodes out for applyBoundaryConditions to map global nodes to matrix nodes
 template<typename scalar>
 Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
 #endif
