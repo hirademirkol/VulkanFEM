@@ -2,6 +2,8 @@
 #define __MULTIGRID_HPP__
 
 #include "FEM.hpp"
+#include "RestrictionOperator.hpp"
+
 #include <Eigen/SparseCholesky>
 
 #include <out.hpp>
@@ -22,7 +24,7 @@ namespace Eigen
 
 		MultigridPreconditioner() : m_isInitialized(false) {}
 
-		explicit MultigridPreconditioner(const MatrixFreeSparse &mat) : ldltSolver(mat.Kc)
+		explicit MultigridPreconditioner(const MatrixFreeSparse<double> &mat) : ldltSolver(mat.Kc)
 		{
 			compute(mat);
 		}
@@ -30,50 +32,24 @@ namespace Eigen
 		EIGEN_CONSTEXPR Index rows() const EIGEN_NOEXCEPT { return matrix->rows(); }
 		EIGEN_CONSTEXPR Index cols() const EIGEN_NOEXCEPT { return matrix->cols(); }
 
-		MultigridPreconditioner &analyzePattern(const MatrixFreeSparse &)
+		MultigridPreconditioner &analyzePattern(const MatrixFreeSparse<double> &)
 		{
 			return *this;
 		}
 
-		MultigridPreconditioner &factorize(const MatrixFreeSparse &mat)
+		MultigridPreconditioner &factorize(const MatrixFreeSparse<double> &mat)
 		{
 			matrix = &mat;
 			numLevels = mat.numLevels;
 			ldltSolver.compute(mat.Kc);
 
-			restrictionOperator << 	1.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-									0.500, 0.500, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-									0.000, 1.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-									0.500, 0.000, 0.500, 0.000, 0.000, 0.000, 0.000, 0.000,
-									0.250, 0.250, 0.250, 0.250, 0.000, 0.000, 0.000, 0.000,
-									0.000, 0.500, 0.000, 0.500, 0.000, 0.000, 0.000, 0.000,
-									0.000, 0.000, 1.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-									0.000, 0.000, 0.500, 0.500, 0.000, 0.000, 0.000, 0.000,
-									0.000, 0.000, 0.000, 1.000, 0.000, 0.000, 0.000, 0.000,
-									0.500, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000,
-									0.250, 0.250, 0.000, 0.000, 0.250, 0.250, 0.000, 0.000,
-									0.000, 0.500, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000,
-									0.250, 0.000, 0.250, 0.000, 0.250, 0.000, 0.250, 0.000,
-									0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125,
-									0.000, 0.250, 0.000, 0.250, 0.000, 0.250, 0.000, 0.250,
-									0.000, 0.000, 0.500, 0.000, 0.000, 0.000, 0.500, 0.000,
-									0.000, 0.000, 0.250, 0.250, 0.000, 0.000, 0.250, 0.250,
-									0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000, 0.500,
-									0.000, 0.000, 0.000, 0.000, 1.000, 0.000, 0.000, 0.000,
-									0.000, 0.000, 0.000, 0.000, 0.500, 0.500, 0.000, 0.000,
-									0.000, 0.000, 0.000, 0.000, 0.000, 1.000, 0.000, 0.000,
-									0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.500, 0.000,
-									0.000, 0.000, 0.000, 0.000, 0.250, 0.250, 0.250, 0.250,
-									0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.500,
-									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.000, 0.000,
-									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.500,
-									0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.000;
+			restrictionOperator = Eigen::Map<Eigen::Matrix<double, 8, 27>>(const_cast<double*>(restrictionOperatorValues.data()), 8, 27).transpose();
 
 			m_isInitialized = true;
 			return *this;
 		}
 
-		MultigridPreconditioner &compute(const MatrixFreeSparse &mat)
+		MultigridPreconditioner &compute(const MatrixFreeSparse<double> &mat)
 		{
 			return factorize(mat);
 		}
@@ -84,10 +60,10 @@ namespace Eigen
 			x += dx;
 		}
 
-		inline Vector restrict(const Vector &x, int level) const
+		inline Vector restrict(const Vector &r, int level) const
 		{
 			Vector result = Vector::Zero(matrix->invDiagKOnLevels[level + 1].rows());
-			Vector tempX = x.cwiseProduct(matrix->restrictionCoefficients[level]);
+			Vector tempR = r.cwiseProduct(matrix->restrictionCoefficients[level]);
 
 			int num = 0;
 			for(auto line : matrix->elementToNodeMatrices[level].rowwise())
@@ -104,7 +80,7 @@ namespace Eigen
 
 				for(int c = 0; c < 3; c++)
 				{
-					result(3 * line + c) += tempX(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+					result(3 * line + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 				}
 
 				num++;
@@ -188,7 +164,7 @@ namespace Eigen
 		ComputationInfo info() { return Success; }
 
 	private:
-		const MatrixFreeSparse *matrix;
+		const MatrixFreeSparse<double> *matrix;
 		SimplicialLDLT<Eigen::SparseMatrix<double>> ldltSolver;
 		int numLevels;
 

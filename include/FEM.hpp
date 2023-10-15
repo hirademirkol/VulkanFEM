@@ -14,28 +14,14 @@
 
 #include <Eigen/Sparse>
 
-// #define MAX_ITER 500
-#define TOLERANCE 1e-6
-
-#define MATRIX_FREE
-
-#ifdef MATRIX_FREE
-    #include "MatrixFreeSparse.hpp"
-
-    #define MULTIGRID
-
-    #ifdef MULTIGRID
-        #define NUM_LEVELS 3
-    #endif
-
-#endif
+#include "FEMDefines.hpp"
 
 #define index(i,j,n) (i)*(n)+(j)
 #define get_symmetric(A,i,j) (i) <= (j) ? A[(i)][(j)] : A[(j)][(i)]
 
 #ifdef MATRIX_FREE
 template<typename scalar>
-MatrixFreeSparse assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
+MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 #else
 template<typename scalar>
 Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, scalar elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
@@ -47,10 +33,10 @@ void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<sca
 
 #ifdef MATRIX_FREE
 template<typename scalar>
-void solveWithCG(const MatrixFreeSparse& A, const std::vector<scalar>& b, std::vector<scalar>& x);
+void solveWithEigen(const MatrixFreeSparse<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
 #else
 template <typename scalar>
-void solveWithCG(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
+void solveWithEigen(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x);
 #endif
 
 #endif // __FEM_HPP__

@@ -1,0 +1,16 @@
+#version 450
+
+#define index gl_GlobalInvocationID.x
+
+#define real double
+
+layout (local_size_x = 64) in;
+
+layout(binding = 0) buffer x1Buffer { real x1[]; };
+layout(binding = 1) buffer x2Buffer { real x2[]; };
+layout(binding = 2) buffer resultBuffer { real result[]; };
+
+void main()
+{
+    result[index] = x1[index] + x2[index];
+}
