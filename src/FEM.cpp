@@ -289,7 +289,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		for(index = 0; index < fixingForcesOnLevel.rows(); index++)
 		{
-			int val = index % 3;
+			int val = index / 3;
 
 			if(fixingForcesOnLevel(index) != 0.0 && (fixedNodesOnLevel.find(val) == fixedNodesOnLevel.end())) 
 				fixedNodesOnLevel.insert(val);
