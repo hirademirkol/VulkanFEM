@@ -7,6 +7,8 @@
 template< typename scalar>
 void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::vector<scalar>& f, std::vector<scalar>& u)
 {
+
+	std::cout << "Initializing GPU Solver" << std::endl;
     uint64_t numDoF = f.size();
 
 	uint64_t memoryUsage = 0;

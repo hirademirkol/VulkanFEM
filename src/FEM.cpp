@@ -235,66 +235,12 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		{
 			usedNodesInLevel[line.first] = index++;
 		}
-
-		std::vector<Eigen::Triplet<scalar>> restrtictionTriplets;
-
-		for(auto globalNode : nodes)
-		{
-			auto finerNode = coarseToFinerNodeMap[globalNode];
-
-			Vec3i diff;
-			FOR3(diff, Vec3i(-1), Vec3i(2))
-			{
-				if(usedNodesInLevels[i-1].contains(Linearize(finerNode + diff, finerNodeDims)))
-				{
-					auto dist = abs(diff.x) + abs(diff.y) + abs(diff.z);
-					scalar val = pow(0.5, 3 + dist);
-
-					for(int c = 0; c < 3; c++)
-					{
-						restrtictionTriplets.push_back(Eigen::Triplet<scalar>(3 * usedNodesInLevel[Linearize(globalNode, nodeDims)] + c,
-																			  3 * usedNodesInLevels[i-1][Linearize(finerNode + diff, finerNodeDims)] + c,
-																			  val));
-					}
-				}
-			}
-		}
-
+		
 		std::vector<Vec3i> elementsVector(elements.size());
 		std::copy(elements.begin(), elements.end(), elementsVector.begin());
  
 		levelElements.push_back(elementsVector);
 		usedNodesInLevels.push_back(usedNodesInLevel);
-
-		auto restriction = Eigen::SparseMatrix<scalar>(usedNodesInLevels[i].size() * 3,usedNodesInLevels[i-1].size() * 3);
-		restriction.setFromTriplets(restrtictionTriplets.begin(), restrtictionTriplets.end());
-		auto interpolation = restriction.transpose() * 8;
-
-		//Find fixed nodes on the level
-		Eigen::ArrayXi fixedNodesAbove(fixedNodesInLevels[i-1].size());
-		index = 0;
-		for(auto val : fixedNodesInLevels[i-1])
-		{
-			fixedNodesAbove[index++] = (int)val;
-		}
-
-		Eigen::VectorXd fixingForcesAbove = Eigen::VectorXd::Zero(usedNodesInLevels[i-1].size() * 3);
-
-		fixingForcesAbove(3 * fixedNodesAbove    ) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
-		fixingForcesAbove(3 * fixedNodesAbove + 1) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
-		fixingForcesAbove(3 * fixedNodesAbove + 2) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
-
-		Eigen::VectorXd fixingForcesOnLevel = restriction * fixingForcesAbove;
-		std::set<uint64_t> fixedNodesOnLevel;
-
-		for(index = 0; index < fixingForcesOnLevel.rows(); index++)
-		{
-			int val = index / 3;
-
-			if(fixingForcesOnLevel(index) != 0.0 && (fixedNodesOnLevel.find(val) == fixedNodesOnLevel.end())) 
-				fixedNodesOnLevel.insert(val);
-		}
-		fixedNodesInLevels.push_back(fixedNodesOnLevel);
 
 		int levelSize = usedNodesInLevel.size() * 3;
 		Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobalOnLevel(levelElements[i].size(), 8);
@@ -329,6 +275,59 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToNodeMatrices.push_back(elementToGlobalOnLevel);
 		restrictionMappings.push_back(restrictionMapping);
 		restrictionCoefficients.push_back(restrictionCoeffVector.cwiseInverse());
+
+		//Find fixed nodes on the level
+		Eigen::ArrayXi fixedNodesAbove(fixedNodesInLevels[i-1].size());
+		index = 0;
+		for(auto val : fixedNodesInLevels[i-1])
+		{
+			fixedNodesAbove[index++] = (int)val;
+		}
+
+		Eigen::VectorXd fixingForcesAbove = Eigen::VectorXd::Zero(usedNodesInLevels[i-1].size() * 3);
+
+		fixingForcesAbove(3 * fixedNodesAbove    ) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+		fixingForcesAbove(3 * fixedNodesAbove + 1) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+		fixingForcesAbove(3 * fixedNodesAbove + 2) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
+
+		//Restrict fixing forces
+		Eigen::Matrix<double, Eigen::Dynamic, 1> fixingForcesOnLevel = Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(usedNodesInLevel.size() * 3);
+		Eigen::Matrix<double, Eigen::Dynamic, 1> tempR = fixingForcesAbove.cwiseProduct(restrictionCoefficients[i - 1]);
+		Eigen::Matrix<double, 27, 8> restrictionOperator = Eigen::Map<Eigen::Matrix<double, 8, 27>>(const_cast<double*>(restrictionOperatorValues.data()), 8, 27).transpose();
+		
+		int num = 0;
+		for(auto line : elementToGlobalOnLevel.rowwise())
+		{
+			Eigen::Array<int, 27, 1> mapping = restrictionMapping.row(num);
+			Eigen::Matrix<double, 27, 1> mask = Eigen::Matrix<double, 27, 1>::Ones(mapping.rows());
+
+			for(int i = 0; i < 27; i++)
+				if(mapping(i) == -1)
+				{
+					mask(i) = 0;
+					mapping(i) = 0;
+				}
+
+			for(int c = 0; c < 3; c++)
+			{
+				fixingForcesOnLevel(3 * line + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+			}
+
+			num++;
+		}
+
+		//Enlist fixed nodes on level
+		std::set<uint64_t> fixedNodesOnLevel;
+
+		for(index = 0; index < fixingForcesOnLevel.rows(); index++)
+		{
+			int val = index / 3;
+
+			if(fixingForcesOnLevel(index) != 0.0 && (fixedNodesOnLevel.find(val) == fixedNodesOnLevel.end())) 
+				fixedNodesOnLevel.insert(val);
+		}
+		fixedNodesInLevels.push_back(fixedNodesOnLevel);
+
 		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(0.5, 2*i) * elementStiffnessMatrix, elementToGlobalOnLevel));
 
 		if(newLevelDims.x <= 2 || newLevelDims.y <= 2 || newLevelDims.z <= 2)
