@@ -328,7 +328,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 		fixedNodesInLevels.push_back(fixedNodesOnLevel);
 
-		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(0.5, 2*i) * elementStiffnessMatrix, elementToGlobalOnLevel));
+		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(2, i) * elementStiffnessMatrix, elementToGlobalOnLevel));
 
 		if(newLevelDims.x <= 2 || newLevelDims.y <= 2 || newLevelDims.z <= 2)
 		{
@@ -374,7 +374,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToGlobalCoarsest.push_back(nodes);
 	}
 
-	auto Kc = assembleK<scalar>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(0.5, 2*(numLevels - 1)));
+	auto Kc = assembleK<scalar>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(2, numLevels - 1));
 
 	systemMatrix.PrepareMultigrid(numLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
