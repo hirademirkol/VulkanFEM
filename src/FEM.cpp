@@ -483,11 +483,11 @@ void solveWithEigen(const Eigen::SparseMatrix<scalar>& A, const std::vector<scal
 	auto start = std::chrono::system_clock::now();
 	x_eig = solver.solve(b_eig);
 	auto end = std::chrono::system_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-	std::cout << "Solving took:    " << duration.count() << " s" << std::endl;
-	std::cout << "#iterations:     " << solver.iterations()      << std::endl;
-	std::cout << "Estimated error: " << solver.error()           << std::endl;
+	std::cout << "Solving took:    " << (float)duration.count() / 1000 << " s" << std::endl;
+	std::cout << "#iterations:     " << solver.iterations()      		<< std::endl;
+	std::cout << "Estimated error: " << solver.error()           		<< std::endl;
 
 	std::memcpy(x.data(), x_eig.data(), x.size()*sizeof(scalar)); 
 }
