@@ -70,6 +70,7 @@ int main(int argc, char* argv[])
 
 	std::cout << "System statistics:" << std::endl;
 	std::cout << "\tVoxel model resolution: " << voxelModelSize.x << " x " << voxelModelSize.y << " x " << voxelModelSize.z << std::endl;
+	std::cout << "\tElements: " << systemMatrix.elementToNode.rows() << std::endl;
 	std::cout << "\tDegrees of freedom: " << numDoF << std::endl;
 
 	std::vector<real> f, u;

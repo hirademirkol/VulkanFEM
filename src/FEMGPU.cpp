@@ -440,9 +440,9 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 #endif
 	}
 	auto end = std::chrono::system_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	
-	std::cout << "Solving took:    " << duration.count() << " s" 					<< std::endl;
+	std::cout << "Solving took:    " << (float)duration.count() / 1000 << " s" 		<< std::endl;
 	std::cout << "#iterations:     " << iter	    								<< std::endl;
 	std::cout << "Estimated error: " << sqrt(*norm2Tensor->data<scalar>() / *norm2)	<< std::endl;
 
