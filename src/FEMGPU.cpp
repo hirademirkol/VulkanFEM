@@ -296,8 +296,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
 	memoryUsage -= rTensor->size()*sizeof(scalar); // Double counted above
 
-	std::cout << "\tData assigned GPU memory: " << (double)memoryUsage/1024/1024 << " MB" << std::endl;
-
 	const std::vector<Tensor> paramsFixedNodesZ = { resultTensors[0],
 											  fixedNodesTensor};
 
@@ -324,6 +322,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldltSolver(systemMatrix.Kc);
 
 #endif
+
+	std::cout << "\tData assigned GPU memory: " << (double)memoryUsage/1024/1024 << " MB" << std::endl;
 
 #ifdef MAX_ITER
 	int maxIterations = MAX_ITER;

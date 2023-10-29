@@ -92,7 +92,6 @@ namespace Eigen
 		{
 			Vector temp = Vector::Zero(matrix->invDiagKOnLevels[level].rows() + 3);
 			int overRow = matrix->invDiagKOnLevels[level].rows() / 3;
-			double zero = 0;
 
 			int num = 0;
 			for(auto line : matrix->elementToNodeMatrices[level].rowwise())

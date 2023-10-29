@@ -87,7 +87,7 @@ inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i
 template <typename scalar>
 inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> elementToNode)
 {
-	Eigen::VectorXd diag(size);
+	Eigen::VectorXd diag = Eigen::VectorXd::Zero(size);
 
 	const Eigen::Array<int, 1, 24> c{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
 	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
