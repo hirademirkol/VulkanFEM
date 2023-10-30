@@ -36,6 +36,8 @@ int main(int argc, char* argv[])
 	}
 	std::string fileName(argv[1]);
 	std::string modelName = fileName.substr(0, fileName.find('.', 1));
+
+	auto start = std::chrono::system_clock::now();
 	int* voxelModel = loadVoxel(modelName, voxelModelSize.x, voxelModelSize.y, voxelModelSize.z);
 
 #ifdef MULTIGRID
@@ -79,6 +81,9 @@ int main(int argc, char* argv[])
 
 	applyBoundaryConditions(f, loadedNodes, fixedNodes);
 
+	auto end = std::chrono::system_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	std::cout << "Preparation took:    " << (float)duration.count() / 1000 << " s" << std::endl;
 #ifdef CPU
 	solveWithEigen<real>(systemMatrix, f, u);
 #else

@@ -10,6 +10,9 @@
 #endif
 
 #include <chrono>
+#include <algorithm>
+#include <execution>
+#include <numeric>
 
 template<typename scalar>
 inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<uint64_t, 8>>& elementToGlobal, double elementStiffness[24][24], scalar multiplier = 1.0)
@@ -53,14 +56,15 @@ inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<ui
 }
 
 inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i nodeGridDimensions,
-							   std::vector<Vec3i>& usedElements, std::map<uint64_t, uint64_t>& usedNodes)
+							   std::vector<Vec3i>& usedElements, std::vector<int>& elementIndices, std::map<uint64_t, uint64_t>& usedNodes)
 {
-	Vec3i element;
+	Vec3i element; int index = 0;
 	FOR3(element,  Vec3i(0), voxelGridDimensions)
 	{
 		if(voxelModel[Linearize(element, voxelGridDimensions)] == 1)
 		{
 			usedElements.push_back(element);
+			elementIndices.push_back(index++);
 		}
 	}
 
@@ -122,8 +126,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	Vec3i nodeGridDimensions = voxelGridDimensions + Vec3i(1);
 
 	std::vector<Vec3i> usedElements;
+	std::vector<int> elementIndices;
 	std::map<uint64_t, uint64_t> usedNodes;
-	EnlistUsedElements(voxelModel, voxelGridDimensions, nodeGridDimensions, usedElements, usedNodes);
+	EnlistUsedElements(voxelModel, voxelGridDimensions, nodeGridDimensions, usedElements, elementIndices, usedNodes);
 
 #ifdef MATRIX_FREE
 
@@ -135,16 +140,16 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	int size = usedNodes.size() * 3;
 
-	int line = 0; Vec3i node;
 	Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobal(usedElements.size(), 8);
-	for (auto element : usedElements)
+
+	std::for_each(std::execution::par_unseq, elementIndices.begin(), elementIndices.end(), [&](int index)
 	{
+		Vec3i node;
 		FOR3(node, Vec3i(0), Vec3i(2))
 		{
-			elementToGlobal(line, Linearize(node, Vec3i(2))) = (int)usedNodes[Linearize(element + node, nodeGridDimensions)];
+			elementToGlobal(index, Linearize(node, Vec3i(2))) = (int)usedNodes[Linearize(usedElements[index] + node, nodeGridDimensions)];
 		}
-		line++;
-	}
+	});
 
 	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
 	for(int i = 0; i < 24; i++)
@@ -213,7 +218,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		{
 			uint64_t ind;
 			Vec3i globalNode;
-
+			Vec3i node;
+			
 			FOR3(node, Vec3i(0), Vec3i(2))
 			{
 				globalNode = element + node;
@@ -238,7 +244,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		
 		std::vector<Vec3i> elementsVector(elements.size());
 		std::copy(elements.begin(), elements.end(), elementsVector.begin());
- 
+		std::vector<int> levelElementIndices(elementsVector.size());
+		std::iota(levelElementIndices.begin(), levelElementIndices.end(), 0);
+
 		levelElements.push_back(elementsVector);
 		usedNodesInLevels.push_back(usedNodesInLevel);
 
@@ -246,32 +254,31 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobalOnLevel(levelElements[i].size(), 8);
 		Eigen::Array<int, Eigen::Dynamic, 27> restrictionMapping(levelElements[i].size(), 27);
 		Eigen::VectorXd restrictionCoeffVector = Eigen::VectorXd::Zero(3 * usedNodesInLevels[i - 1].size());
-		line = 0;
-		for (auto element : levelElements[i])
+
+		std::for_each(std::execution::par_unseq, levelElementIndices.begin(), levelElementIndices.end(), [&](int index)
 		{
-			int restrictionCoeff = 0;
+			Vec3i node; int restrictionCoeff = 0;
 			FOR3(node, Vec3i(0), Vec3i(2))
 			{
-				elementToGlobalOnLevel(line, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(element + node, nodeDims)];
+				elementToGlobalOnLevel(index, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(elementsVector[index] + node, nodeDims)];
 			}
 
 			FOR3(node, Vec3i(0), Vec3i(3))
 			{
-				auto val = Linearize(coarseToFinerNodeMap[element] + node, finerNodeDims);
+				auto val = Linearize(coarseToFinerNodeMap[elementsVector[index]] + node, finerNodeDims);
 				if(usedNodesInLevels[i - 1].contains(val))
 				{
-					restrictionMapping(line, Linearize(node, Vec3i(3))) = (int)usedNodesInLevels[i - 1][val];
+					restrictionMapping(index, Linearize(node, Vec3i(3))) = (int)usedNodesInLevels[i - 1][val];
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val]    )++;
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 1)++;
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 2)++;
 				}
 				else
-					restrictionMapping(line, Linearize(node, Vec3i(3))) = -1;
+					restrictionMapping(index, Linearize(node, Vec3i(3))) = -1;
 			
 			}
+		});
 
-			line++;
-		}
 		elementToNodeMatrices.push_back(elementToGlobalOnLevel);
 		restrictionMappings.push_back(restrictionMapping);
 		restrictionCoefficients.push_back(restrictionCoeffVector.cwiseInverse());
@@ -367,6 +374,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	for (auto element : levelElements[numLevels - 1])
 	{
 		std::array<uint64_t, 8> nodes;
+		Vec3i node;
 		FOR3(node, Vec3i(0), Vec3i(2))
 		{
 			nodes[Linearize(node, Vec3i(2))] = freeNodes[Linearize(element + node, levelDims[numLevels - 1] + Vec3i(1))] - 1;
