@@ -89,12 +89,12 @@ inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i
 #ifdef MULTIGRID
 
 template <typename scalar>
-inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> elementToNode)
+inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 4> elementToNode)
 {
 	Eigen::VectorXd diag = Eigen::VectorXd::Zero(size);
 
-	const Eigen::Array<int, 1, 24> c{0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
-	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
+	const Eigen::Array<int, 1, 24> c   {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5};
+	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3};
 
 	for (auto line : elementToNode.rowwise())
 	{	
@@ -140,14 +140,14 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	int size = usedNodes.size() * 3;
 
-	Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobal(usedElements.size(), 8);
+	Eigen::Array<int, Eigen::Dynamic, 4> elementToGlobal(usedElements.size(), 4);
 
 	std::for_each(std::execution::par_unseq, elementIndices.begin(), elementIndices.end(), [&](int index)
 	{
 		Vec3i node;
-		FOR3(node, Vec3i(0), Vec3i(2))
+		FOR3(node, Vec3i(0), Vec3i(1,2,2))
 		{
-			elementToGlobal(index, Linearize(node, Vec3i(2))) = (int)usedNodes[Linearize(usedElements[index] + node, nodeGridDimensions)];
+			elementToGlobal(index, Linearize(node, Vec3i(1,2,2))) = (int)usedNodes[Linearize(usedElements[index] + node, nodeGridDimensions)];
 		}
 	});
 
@@ -181,7 +181,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
 	std::vector<std::set<uint64_t>> fixedNodesInLevels;
 	std::vector<Eigen::VectorXd> invDiagKOnLevels;
-  	std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> elementToNodeMatrices;
+  	std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> elementToNodeMatrices;
   	std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
 	std::vector<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> restrictionCoefficients;
 
@@ -251,16 +251,16 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		usedNodesInLevels.push_back(usedNodesInLevel);
 
 		int levelSize = usedNodesInLevel.size() * 3;
-		Eigen::Array<int, Eigen::Dynamic, 8> elementToGlobalOnLevel(levelElements[i].size(), 8);
+		Eigen::Array<int, Eigen::Dynamic, 4> elementToGlobalOnLevel(levelElements[i].size(), 4);
 		Eigen::Array<int, Eigen::Dynamic, 27> restrictionMapping(levelElements[i].size(), 27);
 		Eigen::VectorXd restrictionCoeffVector = Eigen::VectorXd::Zero(3 * usedNodesInLevels[i - 1].size());
 
 		std::for_each(std::execution::par_unseq, levelElementIndices.begin(), levelElementIndices.end(), [&](int index)
 		{
 			Vec3i node; int restrictionCoeff = 0;
-			FOR3(node, Vec3i(0), Vec3i(2))
+			FOR3(node, Vec3i(0), Vec3i(1,2,2))
 			{
-				elementToGlobalOnLevel(index, Linearize(node, Vec3i(2))) = (int)usedNodesInLevel[Linearize(elementsVector[index] + node, nodeDims)];
+				elementToGlobalOnLevel(index, Linearize(node, Vec3i(1,2,2))) = (int)usedNodesInLevel[Linearize(elementsVector[index] + node, nodeDims)];
 			}
 
 			FOR3(node, Vec3i(0), Vec3i(3))
@@ -309,15 +309,20 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			Eigen::Matrix<double, 27, 1> mask = Eigen::Matrix<double, 27, 1>::Ones(mapping.rows());
 
 			for(int i = 0; i < 27; i++)
+			{
 				if(mapping(i) == -1)
 				{
 					mask(i) = 0;
 					mapping(i) = 0;
 				}
+			}
+			
+			const Eigen::Array<int, 1, 8> xInd{0, 0, 1, 1, 2, 2, 3, 3};
+			const Eigen::Array<int, 1, 8> offset{0, 1, 0, 1, 0, 1, 0, 1};
 
 			for(int c = 0; c < 3; c++)
 			{
-				fixingForcesOnLevel(3 * line + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+				fixingForcesOnLevel(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 			}
 
 			num++;

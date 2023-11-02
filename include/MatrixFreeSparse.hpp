@@ -43,7 +43,7 @@ public:
 
   MatrixFreeSparse(){}
 
-  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 24, 24> _elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 8> _elementToNode, Eigen::ArrayXi _fixedNodes) 
+  MatrixFreeSparse(StorageIndex _numElements, Eigen::Matrix<double, 24, 24> _elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 4> _elementToNode, Eigen::ArrayXi _fixedNodes) 
                   : numElements(_numElements),
                     elementStiffnessMat(_elementStiffnessMat),
                     elementToNode(_elementToNode),
@@ -54,12 +54,12 @@ public:
   EIGEN_CONSTEXPR Index cols() const EIGEN_NOEXCEPT { return numElements; }
 
   const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
-	Eigen::Array<int, Eigen::Dynamic, 8> elementToNode;
+	Eigen::Array<int, Eigen::Dynamic, 4> elementToNode;
   Eigen::ArrayXi fixedNodes;
 
   //Necessary structs for Multigrid 
   void PrepareMultigrid(int _numLevels,
-                        std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> _elementToNodeMatrices,
+                        std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> _elementToNodeMatrices,
                         std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> _restrictionMappings,
                         std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> _restrictionCoefficients,
                         std::vector<Eigen::VectorXd> _invDiagKOnLevels,
@@ -76,7 +76,7 @@ public:
   }
 
   int numLevels;
-  std::vector<Eigen::Array<int, Eigen::Dynamic, 8>> elementToNodeMatrices;
+  std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> elementToNodeMatrices;
   std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
   std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> restrictionCoefficients;
   std::vector<Eigen::VectorXd> invDiagKOnLevels;
@@ -185,8 +185,8 @@ namespace internal {
     template<typename Dest>
     static void scaleAndAddTo(Dest& dst, const MatrixFreeSparse<double>& lhs, const Rhs& rhs, const Scalar& alpha)
     {
-      const Array<int, 1, 24> c   {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
-      const Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
+      const Array<int, 1, 24> c   {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5};
+      const Array<int, 1, 24> xInd{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3};
 
       for(auto line : lhs.elementToNode.rowwise())
       {

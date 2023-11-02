@@ -72,15 +72,20 @@ namespace Eigen
 				Matrix<double, 27, 1> mask = Matrix<double, 27, 1>::Ones(mapping.rows());
 
 				for(int i = 0; i < 27; i++)
+				{
 					if(mapping(i) == -1)
 					{
 						mask(i) = 0;
 						mapping(i) = 0;
 					}
+				}
+
+				const Array<int, 1, 8> xInd{0, 0, 1, 1, 2, 2, 3, 3};
+				const Array<int, 1, 8> offset{0, 1, 0, 1, 0, 1, 0, 1};
 
 				for(int c = 0; c < 3; c++)
 				{
-					result(3 * line + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+					result(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 				}
 
 				num++;
@@ -106,9 +111,12 @@ namespace Eigen
 					}
 				}
 
+				const Array<int, 1, 8> xInd{0, 0, 1, 1, 2, 2, 3, 3};
+				const Array<int, 1, 8> offset{0, 1, 0, 1, 0, 1, 0, 1};
+
 				for(int c = 0; c < 3; c++)
 				{
-					temp(3 * mapping + c) += restrictionOperator *  x(3 * line + c);
+					temp(3 * mapping + c) += restrictionOperator *  x(3 * (line(xInd) + offset) + c);
 				}
 
 				num++;

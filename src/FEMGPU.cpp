@@ -28,10 +28,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	for(int i = 0; i < numDoF; i++)
 		*norm2 += r[i] * r[i];
 
-	Eigen::Array<int, 8, Eigen::Dynamic> elementToNodeArray = systemMatrix.elementToNode.transpose();
+	Eigen::Array<int, 4, Eigen::Dynamic> elementToNodeArray = systemMatrix.elementToNode.transpose();
 
 	Tensor elementStiffnessTensor = mgr.tensor((void*)systemMatrix.elementStiffnessMat.data(), 24*24, sizeof(scalar), TensorDataTypes::eDouble);
-	Tensor elementToGlobalTensor = mgr.tensor((void*)elementToNodeArray.data(), systemMatrix.elementToNode.rows()*8, sizeof(int), TensorDataTypes::eInt);
+	Tensor elementToGlobalTensor = mgr.tensor((void*)elementToNodeArray.data(), systemMatrix.elementToNode.rows()*4, sizeof(int), TensorDataTypes::eInt);
 	Tensor fixedNodesTensor = mgr.tensor((void*)systemMatrix.fixedNodes.data(), systemMatrix.fixedNodes.rows(), sizeof(int), TensorDataTypes::eInt);
 	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
@@ -177,8 +177,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 	for(int i = 1; i < numLevels; i++)
 	{
-		Eigen::Array<int, 8, Eigen::Dynamic> matrix = systemMatrix.elementToNodeMatrices[i - 1].transpose();
-		auto elementToNodeTensor = mgr.tensor((void*)matrix.data(), matrix.cols()*8, sizeof(int), TensorDataTypes::eInt);
+		Eigen::Array<int, 4, Eigen::Dynamic> matrix = systemMatrix.elementToNodeMatrices[i - 1].transpose();
+		auto elementToNodeTensor = mgr.tensor((void*)matrix.data(), matrix.cols()*4, sizeof(int), TensorDataTypes::eInt);
 		elementToNodeTensors.push_back(elementToNodeTensor);
 
 		Eigen::Array<int, 27, Eigen::Dynamic> matrix2 = systemMatrix.restrictionMappings[i - 1].transpose();
