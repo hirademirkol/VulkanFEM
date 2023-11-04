@@ -10,7 +10,6 @@
 #include "MatxVec.hpp"
 #include "FixedNodes.hpp"
 #include "VecDotVec.hpp"
-#include "GaussSeidel.hpp"
 #include "ConjugateGradient_1.hpp"
 #include "ConjugateGradient_2.hpp"
 

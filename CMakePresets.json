@@ -11,12 +11,33 @@
             }
         },
         {
-            "name": "Linux",
+            "name": "Linux Release",
             "description": "Sets Makefiles generator, compilers, build and install directory, debug build type",
             "generator": "Unix Makefiles",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "Linux Debug",
+            "description": "Sets Makefiles generator, compilers, build and install directory, debug build type",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "Linux RelWithDebInfo",
+            "description": "Sets Makefiles generator, compilers, build and install directory, debug build type",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
         }
     ],
@@ -38,18 +59,15 @@
         },
         {
             "name": "Linux Debug",
-            "configurePreset": "Linux",
-            "configuration": "Debug"
+            "configurePreset": "Linux Debug"
         },
         {
             "name": "Linux Release",
-            "configurePreset": "Linux",
-            "configuration": "Release"
+            "configurePreset": "Linux Release"
         },
         {
             "name": "Linux RelWithDebInfo",
-            "configurePreset": "Linux",
-            "configuration": "RelWithDebInfo"
+            "configurePreset": "Linux RelWithDebInfo"
         }
     ]
 }
