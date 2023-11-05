@@ -5,13 +5,51 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "(gdb) Launch (Release)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Linux/src/Master",
-            "args": ["data/parts.dat", "-n", "3"],
+            "program": "${workspaceFolder}/build/Linux Release/src/Master",
+            "args": ["data/bumpy_torus_512.dat", "-n", "6"],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/Linux/src/",
+            "cwd": "${workspaceFolder}/build/Linux Release/src/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: Build"
+        },        {
+            "name": "(gdb) Launch (Debug)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Linux Debug/src/Master",
+            "args": ["data/bumpy_torus_512.dat", "-n", "6"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/Linux Debug/src/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: Build"
+        },        {
+            "name": "(gdb) Launch (RelWithDebInfo)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Linux RelWithDebInfo/src/Master",
+            "args": ["data/bumpy_torus_512.dat", "-n", "6"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build/Linux RelWithDebInfo/src/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
