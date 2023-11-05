@@ -257,12 +257,12 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		Algorithm algoCWiseMult = mgr.algorithm(paramsCWiseMult, CWiseMultShader, perDoFOnLevelWorkgroup);
 		Algorithm algoPreSmoothAndAxpy = mgr.algorithm(paramsPreSmoothAndAxpy, PreSmoothAndAxpyShader, perDoFOnLevelWorkgroup);
 
-		auto seqRestrict = 
-			mgr.sequence()->record<kp::OpTensorSyncDevice>({rTensorOnLevelBelow})
+		std::vector<Tensor> syncTensors = {rTensorOnLevelBelow};
+		auto seqRestrict =
+			mgr.sequence()->record<kp::OpTensorSyncDevice>(syncTensors)
 						  ->record<kp::OpAlgoDispatch>(algoCWiseMult)
 						  ->record<kp::OpAlgoDispatch>(algoRestrict);
 
-						  
 		auto seqInterpolate = 
 			mgr.sequence()->record<kp::OpTensorSyncDevice>({tempTensors[i - 1]})
 						  ->record<kp::OpAlgoDispatch>(algoInterpolate)
