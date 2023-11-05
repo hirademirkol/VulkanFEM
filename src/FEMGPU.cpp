@@ -4,6 +4,29 @@
 #include <iostream>
 #include <chrono>
 
+#include <kompute/Kompute.hpp>
+
+// Compiled shaders
+#include "MatxVec.hpp"
+#include "FixedNodes.hpp"
+#include "VecDotVec.hpp"
+#include "ConjugateGradient_1.hpp"
+#include "ConjugateGradient_2.hpp"
+
+#ifdef MULTIGRID
+#include "CWiseMult.hpp"
+#include "CWiseAdd.hpp"
+#include "Smooth.hpp"
+#include "Restrict.hpp"
+#include "Interpolate.hpp"
+#endif
+
+typedef std::shared_ptr<kp::Tensor> Tensor;
+typedef std::shared_ptr<kp::Sequence> Sequence;
+typedef std::shared_ptr<kp::Algorithm> Algorithm;
+using TensorDataTypes = kp::Tensor::TensorDataTypes;
+using TensorTypes = kp::Tensor::TensorTypes;
+
 template< typename scalar>
 void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::vector<scalar>& f, std::vector<scalar>& u)
 {
@@ -42,12 +65,12 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 
 	memoryUsage += elementStiffnessTensor->size() * sizeof(scalar);
-	memoryUsage += elementToGlobalTensor->size() * sizeof(int);
-	memoryUsage += fixedNodesTensor->size() * sizeof(int);
-	memoryUsage += pTensor->size() * sizeof(scalar);
-	memoryUsage += AtpTensor->size() * sizeof(scalar);
-	memoryUsage += rTensor->size() * sizeof(scalar);
-	memoryUsage += uTensor->size() * sizeof(scalar);
+	memoryUsage += elementToGlobalTensor->size() * sizeof(int); std::cout << "ElementToGlobalTensor: " << (float)(elementToGlobalTensor->size() * sizeof(int))/1024/1024 << std::endl;
+	memoryUsage += fixedNodesTensor->size() * sizeof(int); std::cout << "fixedNodesTensor: " << (float)(fixedNodesTensor->size() * sizeof(int))/1024/1024 << std::endl;
+	memoryUsage += pTensor->size() * sizeof(scalar); std::cout << "pTensor: " << (float)(pTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
+	memoryUsage += AtpTensor->size() * sizeof(scalar); std::cout << "AtpTensor: " << (float)(AtpTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
+	memoryUsage += rTensor->size() * sizeof(scalar); std::cout << "rTensor: " << (float)(rTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
+	memoryUsage += uTensor->size() * sizeof(scalar); std::cout << "uTensor: " << (float)(uTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
 	memoryUsage += norm1Tensor->size() * sizeof(scalar);
 	memoryUsage += norm2Tensor->size() * sizeof(scalar);
 	memoryUsage += dotPTensor->size() * sizeof(scalar);
@@ -75,11 +98,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 										  norm2Tensor,
 										  dotPTensor};
 
-	const std::vector<Tensor> paramsCG_2 = {pTensor,
-										  rTensor,
-										  norm1Tensor,
-										  norm2Tensor};
-
 	const kp::Workgroup perElementWorkgroup({(uint32_t)systemMatrix.elementToNode.rows(), 1, 1});
 	const kp::Workgroup perFixedNodeWorkgroup({(uint32_t)systemMatrix.fixedNodes.rows()/64 + 1, 1, 1});
 	const kp::Workgroup perDoFWorkgroup({(uint32_t)numDoF/64 + 1, 1, 1});
@@ -104,12 +122,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Algorithm algoVecDotVec = mgr.algorithm(paramsVecDotVec, VecDotVecShader, perDoFWorkgroup);
 	Algorithm algoVecNorm = mgr.algorithm(paramsVecNorm, VecDotVecShader, perDoFWorkgroup);
 	Algorithm algoCG_1 = mgr.algorithm(paramsCG_1, CGShader_1, perDoFWorkgroup);
-	Algorithm algoCG_2 = mgr.algorithm(paramsCG_2, CGShader_2, perDoFWorkgroup);
 
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsMatxVec);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsFixedNodes);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_1);
-	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_2);
 
 	Sequence seqXUpdate =
 		mgr.sequence()->record<kp::OpTensorSyncDevice>({AtpTensor, dotPTensor})
@@ -123,11 +139,22 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 					  ->record<kp::OpAlgoDispatch>(algoVecNorm)
 				  	  ->record<kp::OpTensorSyncLocal>({norm2Tensor});
 
+#ifndef MULTIGRID
+
+	const std::vector<Tensor> paramsCG_2 = {pTensor,
+											rTensor,
+											norm1Tensor,
+											norm2Tensor};
+
+	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_2);
+
+	Algorithm algoCG_2 = mgr.algorithm(paramsCG_2, CGShader_2, perDoFWorkgroup);
+	
 	Sequence seqPUpdate =
 		mgr.sequence()->record<kp::OpAlgoDispatch>(algoCG_2);
 
 
-#ifdef MULTIGRID
+#else
 
 	const std::vector<uint32_t> CWiseMultShader = std::vector<uint32_t>(
 		shaders::CWISEMULT_COMP_SPV.begin(),	shaders::CWISEMULT_COMP_SPV.end());
@@ -185,7 +212,13 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		auto restrictionMappingTensor = mgr.tensor((void*)matrix2.data(), matrix2.cols()*27, sizeof(int), TensorDataTypes::eInt);
 		restrictionMappingTensors.push_back(restrictionMappingTensor);
 
-		auto restrictionCoefficientTensor = mgr.tensor((void*)systemMatrix.restrictionCoefficients[i - 1].data(), systemMatrix.restrictionCoefficients[i - 1].rows(), sizeof(double), TensorDataTypes::eDouble);
+		std::vector<float> dataVector(systemMatrix.restrictionCoefficients[i - 1].rows());
+		for(int j = 0; j < systemMatrix.restrictionCoefficients[i - 1].rows(); j++)
+		{
+			dataVector[j] = (float)systemMatrix.restrictionCoefficients[i - 1](j);
+		}
+		
+		auto restrictionCoefficientTensor = mgr.tensor((void*)dataVector.data(), dataVector.size(), sizeof(float), TensorDataTypes::eFloat);
 		restrictionCoefficientTensors.push_back(restrictionCoefficientTensor);
 
 		auto invDiagKOnLevelTensor = mgr.tensor((void*)systemMatrix.invDiagKOnLevels[i - 1].data(), systemMatrix.invDiagKOnLevels[i - 1].rows(), sizeof(double), TensorDataTypes::eDouble);
@@ -272,26 +305,54 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(resultTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor});
 
+	uint64_t size = 0;
 	for( auto tensor : elementToNodeTensors)
-		memoryUsage += tensor->size()*sizeof(int);
+		size += tensor->size()*sizeof(int);
 
+	std::cout << "elementToNodeTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : restrictionMappingTensors)
-		memoryUsage += tensor->size()*sizeof(int);
+		size += tensor->size()*sizeof(int);
 
+	std::cout << "restrictionMappingTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : restrictionCoefficientTensors)
-		memoryUsage += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(float);
 
+	std::cout << "restrictionCoefficientTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : invDiagKOnLevelTensors)
-		memoryUsage += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(scalar);
 
+	std::cout << "invDiagKOnLevelTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : rTensors)
-		memoryUsage += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(scalar);
 
+	std::cout << "rTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : tempTensors)
-		memoryUsage += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(scalar);
 
+	std::cout << "tempTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
+
+	size = 0;
 	for( auto tensor : resultTensors)
-		memoryUsage += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(scalar);
+
+	std::cout << "resultTensors: " << (float)size/1024/1024 << std::endl;
+	memoryUsage += size;
 
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
 	memoryUsage -= rTensor->size()*sizeof(scalar); // Double counted above

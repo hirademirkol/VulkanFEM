@@ -6,8 +6,6 @@
 
 #include <Eigen/SparseCholesky>
 
-#include <out.hpp>
-
 namespace Eigen
 {
 	class MultigridPreconditioner
