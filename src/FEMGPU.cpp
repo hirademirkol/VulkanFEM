@@ -15,7 +15,7 @@
 
 #ifdef MULTIGRID
 #include "CWiseMult.hpp"
-#include "CWiseAdd.hpp"
+#include "PreSmoothAndAXPY.hpp"
 #include "Smooth.hpp"
 #include "Restrict.hpp"
 #include "Interpolate.hpp"
@@ -159,8 +159,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	const std::vector<uint32_t> CWiseMultShader = std::vector<uint32_t>(
 		shaders::CWISEMULT_COMP_SPV.begin(),	shaders::CWISEMULT_COMP_SPV.end());
 		
-	const std::vector<uint32_t> CWiseAddShader = std::vector<uint32_t>(
-		shaders::CWISEADD_COMP_SPV.begin(),	shaders::CWISEADD_COMP_SPV.end());
+	const std::vector<uint32_t> PreSmoothAndAxpyShader = std::vector<uint32_t>(
+		shaders::PRESMOOTHANDAXPY_COMP_SPV.begin(),	shaders::PRESMOOTHANDAXPY_COMP_SPV.end());
 
 	const std::vector<uint32_t> SmoothShader = std::vector<uint32_t>(
 		shaders::SMOOTH_COMP_SPV.begin(),	shaders::SMOOTH_COMP_SPV.end());
@@ -178,10 +178,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	std::vector<Tensor> invDiagKOnLevelTensors;
 	std::vector<Tensor> rTensors;
 	std::vector<Tensor> tempTensors;
-	std::vector<Tensor> resultTensors;
 	std::vector<std::vector<double>> rs;
 	std::vector<std::vector<double>> temps;
-	std::vector<std::vector<double>> results;
 
 	std::vector<Sequence> seqRestricts;
 	std::vector<Sequence> seqInterpolates;
@@ -191,11 +189,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	//These tensors are recycled during the multigrid section
 	rTensors.push_back(rTensor);
 	tempTensors.push_back(tempTensor);
-
-	std::vector<double> result(systemMatrix.invDiagKOnLevels[0].rows());
-	results.push_back(result);
-	auto resultTensor = mgr.tensor((void*)result.data(), systemMatrix.invDiagKOnLevels[0].rows(), sizeof(double), TensorDataTypes::eDouble);
-	resultTensors.push_back(resultTensor);
 
 	int numLevels = systemMatrix.numLevels;
 
@@ -214,7 +207,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		{
 			dataVector[j] = (float)systemMatrix.restrictionCoefficients[i - 1](j);
 		}
-		
 		auto restrictionCoefficientTensor = mgr.tensor((void*)dataVector.data(), dataVector.size(), sizeof(float), TensorDataTypes::eFloat);
 		restrictionCoefficientTensors.push_back(restrictionCoefficientTensor);
 
@@ -231,11 +223,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		auto tempTensorOnLevelBelow = mgr.tensor((void*)temp.data(), systemMatrix.invDiagKOnLevels[i].rows(), sizeof(double), TensorDataTypes::eDouble);
 		tempTensors.push_back(tempTensorOnLevelBelow);
 
-		std::vector<double> result(systemMatrix.invDiagKOnLevels[i].rows());
-		results.push_back(result);
-		auto resultTensorOnLevelBelow = mgr.tensor((void*)result.data(), systemMatrix.invDiagKOnLevels[i].rows(), sizeof(double), TensorDataTypes::eDouble);
-		resultTensors.push_back(resultTensorOnLevelBelow);
-
 		const std::vector<Tensor> paramsRestrict = { restrictionOperatorTensor,
 													elementToNodeTensor,
 													restrictionMappingTensor,
@@ -245,10 +232,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		const std::vector<Tensor> paramsInterpolate = { restrictionOperatorTensor,
 														elementToNodeTensor,
 														restrictionMappingTensor,
-														resultTensorOnLevelBelow,
+														tempTensorOnLevelBelow,
 														tempTensors[i - 1]};
 
-		const std::vector<Tensor> paramsSmooth = { resultTensors[i - 1],
+		const std::vector<Tensor> paramsSmooth = { tempTensors[i - 1],
 													rTensors[i - 1],
 													invDiagKOnLevelTensors[i - 1]};
 
@@ -256,13 +243,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 													restrictionCoefficientTensor,
 													tempTensors[i - 1]};
 
-		const std::vector<Tensor> paramsCWiseMult2 = { tempTensors[i - 1],
-													restrictionCoefficientTensor,
-													tempTensors[i - 1]};
-
-		const std::vector<Tensor> paramsCWiseAdd = { tempTensors[i - 1],
-													resultTensors[i - 1],
-													resultTensors[i - 1]};
+		const std::vector<Tensor> paramsPreSmoothAndAxpy = { tempTensors[i - 1],
+															 rTensors[i - 1],
+															 invDiagKOnLevelTensors[i - 1],
+															 restrictionCoefficientTensors[i - 1]};
 												  
 		const kp::Workgroup perElementOnLevelWorkgroup({(uint32_t)matrix.cols(), 1, 1});
 		const kp::Workgroup perDoFOnLevelWorkgroup({(uint32_t)systemMatrix.invDiagKOnLevels[i - 1].rows()/64 + 1, 1, 1});
@@ -271,13 +255,10 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		Algorithm algoInterpolate = mgr.algorithm(paramsInterpolate, InterpolateShader, perElementOnLevelWorkgroup);
 		Algorithm algoSmooth = mgr.algorithm(paramsSmooth, SmoothShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseMult = mgr.algorithm(paramsCWiseMult, CWiseMultShader, perDoFOnLevelWorkgroup);
-		Algorithm algoCWiseMult2 = mgr.algorithm(paramsCWiseMult2, CWiseMultShader, perDoFOnLevelWorkgroup);
-		Algorithm algoCWiseAdd = mgr.algorithm(paramsCWiseAdd, CWiseAddShader, perDoFOnLevelWorkgroup);
+		Algorithm algoPreSmoothAndAxpy = mgr.algorithm(paramsPreSmoothAndAxpy, PreSmoothAndAxpyShader, perDoFOnLevelWorkgroup);
 
-		std::vector<Tensor> syncTensors = {resultTensors[i - 1], rTensorOnLevelBelow};
 		auto seqRestrict = 
-			mgr.sequence()->record<kp::OpTensorSyncDevice>(syncTensors)
-						  ->record<kp::OpAlgoDispatch>(algoSmooth)
+			mgr.sequence()->record<kp::OpTensorSyncDevice>({rTensorOnLevelBelow})
 						  ->record<kp::OpAlgoDispatch>(algoCWiseMult)
 						  ->record<kp::OpAlgoDispatch>(algoRestrict);
 
@@ -285,8 +266,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		auto seqInterpolate = 
 			mgr.sequence()->record<kp::OpTensorSyncDevice>({tempTensors[i - 1]})
 						  ->record<kp::OpAlgoDispatch>(algoInterpolate)
-						  ->record<kp::OpAlgoDispatch>(algoCWiseMult2)
-						  ->record<kp::OpAlgoDispatch>(algoCWiseAdd)
+						  ->record<kp::OpAlgoDispatch>(algoPreSmoothAndAxpy)
 						  ->record<kp::OpAlgoDispatch>(algoSmooth);
 
 		seqRestricts.push_back(seqRestrict);
@@ -299,7 +279,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(invDiagKOnLevelTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(rTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(tempTensors);
-	mgr.sequence()->eval<kp::OpTensorSyncDevice>(resultTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor});
 
 	uint64_t size = 0;
@@ -348,24 +327,17 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	std::cout << "tempTensors: " << (float)size/1024/1024 << std::endl;
 	memoryUsage += size;
 
-	size = 0;
-	for( auto tensor : resultTensors)
-		size += tensor->size()*sizeof(scalar);
-
-	std::cout << "resultTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
 
-	const std::vector<Tensor> paramsFixedNodesZ = { resultTensors[0],
+	const std::vector<Tensor> paramsFixedNodesZ = { tempTensors[0],
 											  fixedNodesTensor};
 
 	const std::vector<Tensor> paramsRdotZ = {rTensor,
-											 resultTensors[0],
+											 tempTensors[0],
 											 norm2Tensor};
 
 	const std::vector<Tensor> paramsCG_2Z = {pTensor,
-										  resultTensors[0],
+										  tempTensors[0],
 										  norm1Tensor,
 										  norm2Tensor};
 
@@ -409,7 +381,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	{
 		for(int i = 0; i < numLevels - 1; i++)
 		{
-			memset((void*)resultTensors[i]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i].rows()*sizeof(scalar));
 			memset((void*)rTensors[i + 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i + 1].rows()*sizeof(scalar));
 			seqRestricts[i]->eval();
 		}
@@ -422,9 +393,9 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> solution = ldltSolver.solve(vector1(systemMatrix.coarseFreeDoFs));
 		vector2(systemMatrix.coarseFreeDoFs) = solution;
 
-		memcpy((void*)resultTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
+		memcpy((void*)tempTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
 
-		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[numLevels - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncDevice>({tempTensors[numLevels - 1]});
 
 		for (int i = numLevels - 1; i > 0; i--)
 		{
@@ -439,8 +410,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 					  ->record<kp::OpTensorSyncLocal>({norm2Tensor})
 					  ->eval();
 
-		mgr.sequence()->eval<kp::OpTensorSyncLocal>({resultTensors[0]});
-		memcpy((void*)pTensor->data<scalar>(), (void*)resultTensors[0]->data<scalar>(), resultTensors[0]->size()*sizeof(scalar));
+		mgr.sequence()->eval<kp::OpTensorSyncLocal>({tempTensors[0]});
+		memcpy((void*)pTensor->data<scalar>(), (void*)tempTensors[0]->data<scalar>(), tempTensors[0]->size()*sizeof(scalar));
 		mgr.sequence()->eval<kp::OpTensorSyncDevice>({pTensor});		
 	}
 #endif
@@ -468,7 +439,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 		for(int i = 0; i < numLevels - 1; i++)
 		{
-			memset((void*)resultTensors[i]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i].rows()*sizeof(scalar));
 			memset((void*)rTensors[i + 1]->data<scalar>(), 0, systemMatrix.invDiagKOnLevels[i + 1].rows()*sizeof(scalar));
 			seqRestricts[i]->eval();
 		}
@@ -481,9 +451,9 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		Eigen::Matrix<scalar, Eigen::Dynamic, 1> solution = ldltSolver.solve(vector1(systemMatrix.coarseFreeDoFs));
 		vector2(systemMatrix.coarseFreeDoFs) = solution;
 
-		memcpy((void*)resultTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
+		memcpy((void*)tempTensors[numLevels - 1]->data<scalar>(), (void*)vector2.data(), vector2.rows()*sizeof(scalar));
 
-		mgr.sequence()->eval<kp::OpTensorSyncDevice>({resultTensors[numLevels - 1]});
+		mgr.sequence()->eval<kp::OpTensorSyncDevice>({tempTensors[numLevels - 1]});
 
 		*norm2Tensor->data<scalar>() = 0.0;
 

@@ -31,8 +31,8 @@ vulkan_compile_shader(INFILE CWiseMult.comp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
-vulkan_compile_shader(INFILE CWiseAdd.comp
-    OUTFILE CWiseAdd.hpp
+vulkan_compile_shader(INFILE PreSmoothAndAXPY.comp
+    OUTFILE PreSmoothAndAXPY.hpp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
@@ -58,7 +58,7 @@ add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp"
                               "${CMAKE_CURRENT_BINARY_DIR}/ConjugateGradient_1.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/ConjugateGradient_2.hpp"
                               "${CMAKE_CURRENT_BINARY_DIR}/CWiseMult.hpp" 
-                              "${CMAKE_CURRENT_BINARY_DIR}/CWiseAdd.hpp" 
+                              "${CMAKE_CURRENT_BINARY_DIR}/PreSmoothAndAXPY.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/Smooth.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/Restrict.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/Interpolate.hpp")
