@@ -57,7 +57,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Tensor elementToGlobalTensor = mgr.tensor((void*)elementToNodeArray.data(), systemMatrix.elementToNode.rows()*4, sizeof(int), TensorDataTypes::eInt);
 	Tensor fixedNodesTensor = mgr.tensor((void*)systemMatrix.fixedNodes.data(), systemMatrix.fixedNodes.rows(), sizeof(int), TensorDataTypes::eInt);
 	Tensor pTensor = mgr.tensor((void*)p.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
-	Tensor AtpTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
+	Tensor tempTensor = mgr.tensor((void*)Atp.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor rTensor = mgr.tensor((void*)r.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor uTensor = mgr.tensor((void*)u.data(), (uint64_t)numDoF, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 	Tensor norm1Tensor = mgr.tensor((void*)norm1, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
@@ -68,7 +68,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	memoryUsage += elementToGlobalTensor->size() * sizeof(int); std::cout << "ElementToGlobalTensor: " << (float)(elementToGlobalTensor->size() * sizeof(int))/1024/1024 << std::endl;
 	memoryUsage += fixedNodesTensor->size() * sizeof(int); std::cout << "fixedNodesTensor: " << (float)(fixedNodesTensor->size() * sizeof(int))/1024/1024 << std::endl;
 	memoryUsage += pTensor->size() * sizeof(scalar); std::cout << "pTensor: " << (float)(pTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
-	memoryUsage += AtpTensor->size() * sizeof(scalar); std::cout << "AtpTensor: " << (float)(AtpTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
+	memoryUsage += tempTensor->size() * sizeof(scalar); std::cout << "tempTensor: " << (float)(tempTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
 	memoryUsage += rTensor->size() * sizeof(scalar); std::cout << "rTensor: " << (float)(rTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
 	memoryUsage += uTensor->size() * sizeof(scalar); std::cout << "uTensor: " << (float)(uTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
 	memoryUsage += norm1Tensor->size() * sizeof(scalar);
@@ -78,13 +78,13 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	const std::vector<Tensor> paramsMatxVec = {elementStiffnessTensor,
 											   elementToGlobalTensor,
 											   pTensor,
-											   AtpTensor};
+											   tempTensor};
 
-	const std::vector<Tensor> paramsFixedNodes = {AtpTensor,
+	const std::vector<Tensor> paramsFixedNodes = {tempTensor,
 											   fixedNodesTensor};
 
 	const std::vector<Tensor> paramsVecDotVec = {pTensor,
-										 		 AtpTensor,
+										 		 tempTensor,
 												 dotPTensor};
 
 	const std::vector<Tensor> paramsVecNorm = {rTensor,
@@ -92,7 +92,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 												 norm2Tensor};
 
 	const std::vector<Tensor> paramsCG_1 = {pTensor,
-										  AtpTensor,
+										  tempTensor,
 										  rTensor,
 										  uTensor,
 										  norm2Tensor,
@@ -128,7 +128,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(paramsCG_1);
 
 	Sequence seqXUpdate =
-		mgr.sequence()->record<kp::OpTensorSyncDevice>({AtpTensor, dotPTensor})
+		mgr.sequence()->record<kp::OpTensorSyncDevice>({tempTensor, dotPTensor})
 					  ->record<kp::OpAlgoDispatch>(algoMatxVec)
 					  ->record<kp::OpAlgoDispatch>(algoFixedNodes)
 					  ->record<kp::OpAlgoDispatch>(algoVecDotVec)
@@ -188,11 +188,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 	auto restrictionOperatorTensor = mgr.tensor((void*)restrictionOperatorValues.data(), 27*8, sizeof(double), TensorDataTypes::eDouble);
 
+	//These tensors are recycled during the multigrid section
 	rTensors.push_back(rTensor);
-
-	std::vector<double> temp(systemMatrix.invDiagKOnLevels[0].rows());
-	temps.push_back(temp);
-	auto tempTensor = mgr.tensor((void*)temp.data(), systemMatrix.invDiagKOnLevels[0].rows(), sizeof(double), TensorDataTypes::eDouble);
 	tempTensors.push_back(tempTensor);
 
 	std::vector<double> result(systemMatrix.invDiagKOnLevels[0].rows());
@@ -337,12 +334,16 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	for( auto tensor : rTensors)
 		size += tensor->size()*sizeof(scalar);
 
+	size -= rTensor->size()*sizeof(scalar); // Double counted above
+
 	std::cout << "rTensors: " << (float)size/1024/1024 << std::endl;
 	memoryUsage += size;
 
 	size = 0;
 	for( auto tensor : tempTensors)
 		size += tensor->size()*sizeof(scalar);
+
+	size -= tempTensor->size()*sizeof(scalar); // Double counted above
 
 	std::cout << "tempTensors: " << (float)size/1024/1024 << std::endl;
 	memoryUsage += size;
@@ -355,7 +356,6 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	memoryUsage += size;
 
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
-	memoryUsage -= rTensor->size()*sizeof(scalar); // Double counted above
 
 	const std::vector<Tensor> paramsFixedNodesZ = { resultTensors[0],
 											  fixedNodesTensor};
@@ -447,7 +447,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 	for(iter = 0; iter < maxIterations; iter++)
 	{
-		memset((void*)AtpTensor->data<scalar>(), 0, Atp.size()*sizeof(scalar));
+		memset((void*)tempTensor->data<scalar>(), 0, Atp.size()*sizeof(scalar));
 		*dotPTensor->data<scalar>() = 0.0;
 
 		seqXUpdate->eval();
