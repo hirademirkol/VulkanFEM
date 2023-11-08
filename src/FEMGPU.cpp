@@ -217,8 +217,13 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		}
 		auto restrictionCoefficientTensor = mgr.tensor((void*)dataVector.data(), dataVector.size(), sizeof(float), TensorDataTypes::eFloat);
 		restrictionCoefficientTensors.push_back(restrictionCoefficientTensor);
-
-		auto invDiagKOnLevelTensor = mgr.tensor((void*)systemMatrix.invDiagKOnLevels[i - 1].data(), systemMatrix.invDiagKOnLevels[i - 1].rows(), sizeof(double), TensorDataTypes::eDouble);
+		
+		std::vector<float> dataVector2(systemMatrix.invDiagKOnLevels[i - 1].rows());
+		for(int j = 0; j < systemMatrix.invDiagKOnLevels[i - 1].rows(); j++)
+		{
+			dataVector2[j] = (float)systemMatrix.invDiagKOnLevels[i - 1](j);
+		}
+		auto invDiagKOnLevelTensor = mgr.tensor((void*)dataVector2.data(), dataVector2.size(), sizeof(float), TensorDataTypes::eFloat);
 		invDiagKOnLevelTensors.push_back(invDiagKOnLevelTensor);
 
 		std::vector<double> r(systemMatrix.invDiagKOnLevels[i].rows());
@@ -343,7 +348,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 
 	size = 0;
 	for( auto tensor : invDiagKOnLevelTensors)
-		size += tensor->size()*sizeof(scalar);
+		size += tensor->size()*sizeof(float);
 
 	std::cout << "invDiagKOnLevelTensors: " << (float)size/1024/1024 << std::endl;
 	memoryUsage += size;

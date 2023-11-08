@@ -79,7 +79,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Windows/src/Release/Master.exe",
-            "args": ["data/bumpy_torus_400.dat", "-n", "5", "--skip", "1"],
+            "args": ["data/bumpy_torus_400.dat", "-n", "4", "--skip", "1"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/Windows/src/Release/",
             "environment": [],
