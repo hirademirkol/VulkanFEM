@@ -42,6 +42,7 @@ namespace Eigen
 			ldltSolver.compute(mat.Kc);
 
 			restrictionOperator = Eigen::Map<Eigen::Matrix<double, 8, 27>>(const_cast<double*>(restrictionOperatorValues.data()), 8, 27).transpose();
+			restrictionOperator4 = Eigen::Map<Eigen::Matrix<double, 8, 125>>(const_cast<double*>(restrictionOperator4Values.data()), 8, 125).transpose();
 
 			m_isInitialized = true;
 			return *this;
@@ -66,10 +67,10 @@ namespace Eigen
 			int num = 0;
 			for(auto line : matrix->elementToNodeMatrices[level].rowwise())
 			{
-				Array<int, 27, 1> mapping = matrix->restrictionMappings[level].row(num);
-				Matrix<double, 27, 1> mask = Matrix<double, 27, 1>::Ones(mapping.rows());
+				Array<int, Eigen::Dynamic, 1> mapping = matrix->restrictionMappings[level].row(num);
+				Matrix<double, Eigen::Dynamic, 1> mask = Matrix<double, Eigen::Dynamic, 1>::Ones(mapping.rows());
 
-				for(int i = 0; i < 27; i++)
+				for(int i = 0; i < mapping.rows(); i++)
 				{
 					if(mapping(i) == -1)
 					{
@@ -83,7 +84,10 @@ namespace Eigen
 
 				for(int c = 0; c < 3; c++)
 				{
-					result(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+					if(level == 0 && matrix->skipLevels == 1)
+						result(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator4;
+					else
+						result(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 				}
 
 				num++;
@@ -99,9 +103,9 @@ namespace Eigen
 			int num = 0;
 			for(auto line : matrix->elementToNodeMatrices[level].rowwise())
 			{
-				Array<int, 27, 1> mapping = matrix->restrictionMappings[level].row(num);
+				Array<int, Eigen::Dynamic, 1> mapping = matrix->restrictionMappings[level].row(num);
 
-				for(int i = 0; i < 27; i++)
+				for(int i = 0; i < mapping.rows(); i++)
 				{
 					if(mapping(i) == -1)
 					{
@@ -114,7 +118,10 @@ namespace Eigen
 
 				for(int c = 0; c < 3; c++)
 				{
-					temp(3 * mapping + c) += restrictionOperator *  x(3 * (line(xInd) + offset) + c);
+					if(level == 0 && matrix->skipLevels == 1)
+						temp(3 * mapping + c) += restrictionOperator4 *  x(3 * (line(xInd) + offset) + c);
+					else
+						temp(3 * mapping + c) += restrictionOperator *  x(3 * (line(xInd) + offset) + c);
 				}
 
 				num++;
@@ -176,6 +183,7 @@ namespace Eigen
 		bool m_isInitialized;
 
 		Matrix<double, 27, 8> restrictionOperator;
+		Matrix<double, 125, 8> restrictionOperator4;
 	};
 }
 

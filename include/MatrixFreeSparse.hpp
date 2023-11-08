@@ -59,14 +59,16 @@ public:
 
   //Necessary structs for Multigrid 
   void PrepareMultigrid(int _numLevels,
+                        int _skipLevels,
                         std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> _elementToNodeMatrices,
-                        std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> _restrictionMappings,
+                        std::vector<Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic>> _restrictionMappings,
                         std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> _restrictionCoefficients,
                         std::vector<Eigen::VectorXd> _invDiagKOnLevels,
                         Eigen::SparseMatrix<double> _Kc,
                         Eigen::ArrayXi _coarseFreeDoFs)
   {
     numLevels = _numLevels;
+    skipLevels = _skipLevels;
     elementToNodeMatrices = _elementToNodeMatrices;
     restrictionMappings = _restrictionMappings;
     restrictionCoefficients = _restrictionCoefficients;
@@ -76,8 +78,9 @@ public:
   }
 
   int numLevels;
+  int skipLevels;
   std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> elementToNodeMatrices;
-  std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
+  std::vector<Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic>> restrictionMappings;
   std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> restrictionCoefficients;
   std::vector<Eigen::VectorXd> invDiagKOnLevels;
   Eigen::SparseMatrix<double> Kc;

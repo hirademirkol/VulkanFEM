@@ -42,11 +42,18 @@ int main(int argc, char* argv[])
 
 #ifdef MULTIGRID
 	int numLevels = 3;
+	int skipLevels = 0;
 	if(argc > 2)
 	{
 		if(std::string(argv[2]) == "-n") numLevels = std::stoi(argv[3]);
 	}
-	std::cout << "Number of levels for Multigrid: " << numLevels << std::endl;
+	if(argc > 4)
+	{
+		if(std::string(argv[4]) == "--skip") skipLevels = std::stoi(argv[5]);
+	}
+	std::cout << "Number of levels for Multigrid: " << numLevels;
+	if(skipLevels != 0) std::cout << " (+ " << skipLevels << " jump(s))";
+	std::cout << std::endl;
 #endif
 
 
@@ -64,7 +71,7 @@ int main(int argc, char* argv[])
 	#ifndef MULTIGRID
 	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
 	#else
-	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes, numLevels);
+	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes, numLevels, skipLevels);
 	#endif
 #endif
 

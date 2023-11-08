@@ -138,7 +138,7 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 #ifdef MATRIX_FREE
 	#ifdef MULTIGRID
 template<typename scalar>
-MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels)
+MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels, int skipLevels)
     #else
 template<typename scalar>
 MatrixFreeSparse<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes)
@@ -202,20 +202,13 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	std::cout << "Preparing the Multigrid structure" << std::endl;
 
-	std::array<int, 64> restrictionOnElementData =
-	{
-		0, 1, 3, 4, 9, 10, 12, 13,
-		1, 2, 4, 5, 10, 11, 13, 14,
-		3, 4, 6, 7, 12, 13, 15, 16,
-		4, 5, 7, 8, 13, 14, 16, 17,
-		9, 10, 12, 13, 18, 19, 21, 22,
-		10, 11, 13, 14, 19, 20, 22, 23,
-		12, 13, 15, 16, 21, 22, 24, 25,
-		13, 14, 16, 17, 22, 23, 25, 26
-	};
-	Eigen::Array<int, 8, 8> restrictionOnElement =  Eigen::Map<Eigen::Array<int, 8, 8>>(restrictionOnElementData.data());
+
+	Eigen::Array<int, 8, 8> restrictionOnElement =  Eigen::Map<Eigen::Array<int, 8, 8>>(const_cast<int*>(restrictionOnElementValues.data()));
+	Eigen::Array<int, 64, 8> restrictionOnElement4 =  Eigen::Map<Eigen::Array<int, 8, 64>>(const_cast<int*>(restrictionOnElement4Values.data()), 8, 64).transpose();
 	Eigen::Matrix<double, 27, 8> restrictionOperator = Eigen::Map<Eigen::Matrix<double, 8, 27>>(const_cast<double*>(restrictionOperatorValues.data()), 8, 27).transpose();
+	Eigen::Matrix<double, 125, 8> restrictionOperator4 = Eigen::Map<Eigen::Matrix<double, 8, 125>>(const_cast<double*>(restrictionOperator4Values.data()), 8, 125).transpose();
 	Eigen::Matrix<double, 81, 24> restrictionOperatorDoF = Eigen::Map<Eigen::Matrix<double, 24, 81>>(const_cast<double*>(restrictionOperatorDoFValues.data()), 24, 81).transpose();
+	Eigen::Matrix<double, 375, 24> restrictionOperatorDoF4 = Eigen::Map<Eigen::Matrix<double, 24, 375>>(const_cast<double*>(restrictionOperatorDoF4Values.data()), 24, 375).transpose();
 
 	//Prepare multigrid related matrices
 	std::vector<Vec3i> levelDims;
@@ -224,7 +217,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	std::vector<std::set<uint64_t>> fixedNodesInLevels;
 	std::vector<Eigen::VectorXd> invDiagKOnLevels;
   	std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> elementToNodeMatrices;
-  	std::vector<Eigen::Array<int, Eigen::Dynamic, 27>> restrictionMappings;
+  	std::vector<Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic>> restrictionMappings;
 	std::vector<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> restrictionCoefficients;
 
 	levelDims.push_back(voxelGridDimensions);
@@ -243,11 +236,20 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		std::set<Vec3i> elements, nodes;
 		std::map<Vec3i, std::vector<Vec3i>> coarseToFinerElementMap;
+
+		int divider = 2;
+		int numberOfChildren = 8;
+		if(i == 1 && skipLevels > 0)
+		{
+			divider = pow(2, skipLevels + 1);
+			numberOfChildren = pow(divider, 3);
+		}
+
 		for(auto finerElement: levelElements[i-1])
 		{
-			int x = finerElement.x / 2;
-			int y = finerElement.y / 2;
-			int z = finerElement.z / 2;
+			int x = finerElement.x / divider;
+			int y = finerElement.y / divider;
+			int z = finerElement.z / divider;
 
 			elements.insert(Vec3i(x,y,z));
 			coarseToFinerElementMap[Vec3i(x,y,z)].push_back(finerElement);
@@ -276,7 +278,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 					usedNodesInLevel[ind] = ind;
 
 					if(!coarseToFinerNodeMap.contains(globalNode))
-						coarseToFinerNodeMap[globalNode] = Vec3i(globalNode.x * 2, globalNode.y * 2, globalNode.z * 2);
+						coarseToFinerNodeMap[globalNode] = Vec3i(globalNode.x * divider, globalNode.y * divider, globalNode.z * divider);
 				}
 			}
 		}
@@ -296,8 +298,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		usedNodesInLevels.push_back(usedNodesInLevel);
 
 		int levelSize = usedNodesInLevel.size() * 3;
+		int numBoundingNodesOnAxis = divider + 1;
 		Eigen::Array<int, Eigen::Dynamic, 4> elementToGlobalOnLevel(levelElements[i].size(), 4);
-		Eigen::Array<int, Eigen::Dynamic, 27> restrictionMapping(levelElements[i].size(), 27);
+		Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic> restrictionMapping(levelElements[i].size(), (int)pow(numBoundingNodesOnAxis, 3));
 		Eigen::VectorXd restrictionCoeffVector = Eigen::VectorXd::Zero(3 * usedNodesInLevels[i - 1].size());
 
 		std::mutex mapMutex;
@@ -310,40 +313,49 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 				elementToGlobalOnLevel(index, Linearize(node, Vec3i(1,2,2))) = (int)usedNodesInLevel[Linearize(elementsVector[index] + node, nodeDims)];
 			}
 
-			FOR3(node, Vec3i(0), Vec3i(3))
+			FOR3(node, Vec3i(0), Vec3i(numBoundingNodesOnAxis))
 			{
 				auto val = Linearize(coarseToFinerNodeMap[elementsVector[index]] + node, finerNodeDims);
 				if(usedNodesInLevels[i - 1].contains(val))
 				{
-					restrictionMapping(index, Linearize(node, Vec3i(3))) = (int)usedNodesInLevels[i - 1][val];
+					restrictionMapping(index, Linearize(node, Vec3i(numBoundingNodesOnAxis))) = (int)usedNodesInLevels[i - 1][val];
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val]    )++;
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 1)++;
 					restrictionCoeffVector(3 * usedNodesInLevels[i - 1][val] + 2)++;
 				}
 				else
 				{
-					restrictionMapping(index, Linearize(node, Vec3i(3))) = -1;
+					restrictionMapping(index, Linearize(node, Vec3i(numBoundingNodesOnAxis))) = -1;
 				}
 			}
 
-			if(coarseToFinerElementMap[elementsVector[index]].size() < 8)
+			if(coarseToFinerElementMap[elementsVector[index]].size() < numberOfChildren)
 			{
-				Eigen::Matrix<scalar, 81, 81> tmpKfine = Eigen::Matrix<scalar, 81, 81>::Zero(81, 81);
-
+				Eigen::Matrix<scalar, Eigen::Dynamic, Eigen::Dynamic> tmpKfine = Eigen::Matrix<scalar, Eigen::Dynamic, Eigen::Dynamic>::Zero(3*pow(numBoundingNodesOnAxis, 3), 3*pow(numBoundingNodesOnAxis, 3));
+				
 				const Eigen::Array<int, 1, 24> c   {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
 				const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
 
-				Vec3i firstFinerElement = Vec3i(elementsVector[index].x * 2, elementsVector[index].y * 2, elementsVector[index].z * 2);
+				Vec3i firstFinerElement = Vec3i(elementsVector[index].x * divider, elementsVector[index].y * divider, elementsVector[index].z * divider);
 				for(auto finerElement : coarseToFinerElementMap[elementsVector[index]])
 				{
 					Vec3i element = finerElement - firstFinerElement;
-					int elementIndex = Linearize(element, Vec3i(2));
+					int elementIndex = Linearize(element, Vec3i(divider));
 
-					tmpKfine(3 * restrictionOnElement(elementIndex, xInd) + c, 3 * restrictionOnElement(elementIndex, xInd) + c) += pow(2, i - 1) * elementStiffnessMatrix;
+					if(i == 1 && skipLevels == 1)
+						tmpKfine(3 * restrictionOnElement4(elementIndex, xInd) + c, 3 * restrictionOnElement4(elementIndex, xInd) + c) += pow(2, i - 1) * elementStiffnessMatrix;
+					else
+						tmpKfine(3 * restrictionOnElement(elementIndex, xInd) + c, 3 * restrictionOnElement(elementIndex, xInd) + c) += pow(2, i - 1) * elementStiffnessMatrix;
 				}
 
+				Eigen::Matrix<scalar, 24, 24> K;
+				if(i == 1 && skipLevels == 1)
+					K = restrictionOperatorDoF4.transpose() * tmpKfine * restrictionOperatorDoF4;
+				else
+					K = restrictionOperatorDoF.transpose() * tmpKfine * restrictionOperatorDoF;
+
 				std::lock_guard<std::mutex> lock(mapMutex);
-				uniqueKsOnLevel[index] = restrictionOperatorDoF.transpose() * tmpKfine * restrictionOperatorDoF;
+				uniqueKsOnLevel[index] = K;
 			}
 		});
 
@@ -372,10 +384,10 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		int num = 0;
 		for(auto line : elementToGlobalOnLevel.rowwise())
 		{
-			Eigen::Array<int, 27, 1> mapping = restrictionMapping.row(num);
-			Eigen::Matrix<double, 27, 1> mask = Eigen::Matrix<double, 27, 1>::Ones(mapping.rows());
+			Eigen::Array<int, Eigen::Dynamic, 1> mapping = restrictionMapping.row(num);
+			Eigen::Matrix<double, Eigen::Dynamic, 1> mask = Eigen::Matrix<double, Eigen::Dynamic, 1>::Ones(mapping.rows());
 
-			for(int i = 0; i < 27; i++)
+			for(int i = 0; i < pow(numBoundingNodesOnAxis, 3); i++)
 			{
 				if(mapping(i) == -1)
 				{
@@ -389,7 +401,10 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 			for(int c = 0; c < 3; c++)
 			{
-				fixingForcesOnLevel(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
+				if(i == 1 && skipLevels == 1)
+					fixingForcesOnLevel(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator4;
+				else
+					fixingForcesOnLevel(3 * (line(xInd) + offset) + c) += tempR(3 * mapping + c).cwiseProduct(mask).transpose() * restrictionOperator;
 			}
 
 			num++;
@@ -407,7 +422,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 		fixedNodesInLevels.push_back(fixedNodesOnLevel);
 
-		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(2, i) * elementStiffnessMatrix, elementToGlobalOnLevel, uniqueKsOnLevel));
+		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(2, i + skipLevels) * elementStiffnessMatrix, elementToGlobalOnLevel, uniqueKsOnLevel));
 
 		if(newLevelDims.x <= 2 || newLevelDims.y <= 2 || newLevelDims.z <= 2)
 		{
@@ -454,9 +469,9 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToGlobalCoarsest.push_back(nodes);
 	}
 
-	auto Kc = assembleK<scalar>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(2, numLevels - 1));
+	auto Kc = assembleK<scalar>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(2, numLevels + skipLevels - 1));
 
-	systemMatrix.PrepareMultigrid(numLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
+	systemMatrix.PrepareMultigrid(numLevels, skipLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
 
 #else // MATRIX_FREE
@@ -495,7 +510,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 #ifdef MATRIX_FREE
 	#ifdef MULTIGRID
-template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels);
+template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes, int numLevels, int skipLevels);
 	#else
 template MatrixFreeSparse<double> assembleSystemMatrix<double>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);
 // template MatrixFreeSparse<float> assembleSystemMatrix<float>(int* voxelModel, Vec3i voxelGridDimensions, double elementStiffness[24][24], const std::set<uint64_t>& fixedNodes);

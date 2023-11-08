@@ -51,6 +51,16 @@ vulkan_compile_shader(INFILE Interpolate.comp
     NAMESPACE "shaders"
     RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
 
+vulkan_compile_shader(INFILE RestrictDouble.comp
+    OUTFILE RestrictDouble.hpp
+    NAMESPACE "shaders"
+    RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
+
+vulkan_compile_shader(INFILE InterpolateDouble.comp
+    OUTFILE InterpolateDouble.hpp
+    NAMESPACE "shaders"
+    RELATIVE_PATH "${kompute_SOURCE_DIR}/cmake")
+
 # Then add it to the library, so you can access it later in your code
 add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/FixedNodes.hpp" 
@@ -61,6 +71,8 @@ add_library(shaders INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/MatxVec.hpp"
                               "${CMAKE_CURRENT_BINARY_DIR}/PreSmoothAndAXPY.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/Smooth.hpp" 
                               "${CMAKE_CURRENT_BINARY_DIR}/Restrict.hpp" 
-                              "${CMAKE_CURRENT_BINARY_DIR}/Interpolate.hpp")
+                              "${CMAKE_CURRENT_BINARY_DIR}/Interpolate.hpp" 
+                              "${CMAKE_CURRENT_BINARY_DIR}/RestrictDouble.hpp" 
+                              "${CMAKE_CURRENT_BINARY_DIR}/InterpolateDouble.hpp")
 
 target_include_directories(shaders INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)

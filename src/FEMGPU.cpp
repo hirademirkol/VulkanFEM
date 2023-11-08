@@ -19,6 +19,8 @@
 #include "Smooth.hpp"
 #include "Restrict.hpp"
 #include "Interpolate.hpp"
+#include "RestrictDouble.hpp"
+#include "InterpolateDouble.hpp"
 #endif
 
 typedef std::shared_ptr<kp::Tensor> Tensor;
@@ -171,6 +173,11 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	const std::vector<uint32_t> InterpolateShader = std::vector<uint32_t>(
 		shaders::INTERPOLATE_COMP_SPV.begin(),	shaders::INTERPOLATE_COMP_SPV.end());
 
+	const std::vector<uint32_t> RestrictDoubleShader = std::vector<uint32_t>(
+		shaders::RESTRICTDOUBLE_COMP_SPV.begin(),	shaders::RESTRICTDOUBLE_COMP_SPV.end());
+		
+	const std::vector<uint32_t> InterpolateDoubleShader = std::vector<uint32_t>(
+		shaders::INTERPOLATEDOUBLE_COMP_SPV.begin(),	shaders::INTERPOLATEDOUBLE_COMP_SPV.end());
 
 	std::vector<Tensor> elementToNodeTensors;
 	std::vector<Tensor> restrictionMappingTensors;
@@ -185,6 +192,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	std::vector<Sequence> seqInterpolates;
 
 	auto restrictionOperatorTensor = mgr.tensor((void*)restrictionOperatorValues.data(), 27*8, sizeof(double), TensorDataTypes::eDouble);
+	auto restrictionOperator4Tensor = mgr.tensor((void*)restrictionOperator4Values.data(), 125*8, sizeof(double), TensorDataTypes::eDouble);
 
 	//These tensors are recycled during the multigrid section
 	rTensors.push_back(rTensor);
@@ -198,8 +206,8 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		auto elementToNodeTensor = mgr.tensor((void*)matrix.data(), matrix.cols()*4, sizeof(int), TensorDataTypes::eInt);
 		elementToNodeTensors.push_back(elementToNodeTensor);
 
-		Eigen::Array<int, 27, Eigen::Dynamic> matrix2 = systemMatrix.restrictionMappings[i - 1].transpose();
-		auto restrictionMappingTensor = mgr.tensor((void*)matrix2.data(), matrix2.cols()*27, sizeof(int), TensorDataTypes::eInt);
+		Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic> matrix2 = systemMatrix.restrictionMappings[i - 1].transpose();
+		auto restrictionMappingTensor = mgr.tensor((void*)matrix2.data(), matrix2.cols()*matrix2.rows(), sizeof(int), TensorDataTypes::eInt);
 		restrictionMappingTensors.push_back(restrictionMappingTensor);
 
 		std::vector<float> dataVector(systemMatrix.restrictionCoefficients[i - 1].rows());
@@ -223,17 +231,36 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		auto tempTensorOnLevelBelow = mgr.tensor((void*)temp.data(), systemMatrix.invDiagKOnLevels[i].rows(), sizeof(double), TensorDataTypes::eDouble);
 		tempTensors.push_back(tempTensorOnLevelBelow);
 
-		const std::vector<Tensor> paramsRestrict = { restrictionOperatorTensor,
-													elementToNodeTensor,
-													restrictionMappingTensor,
-													tempTensors[i - 1],
-													rTensorOnLevelBelow};
+		std::vector<Tensor> paramsRestrict;
+		std::vector<Tensor> paramsInterpolate;
+		if(i == 1 && systemMatrix.skipLevels == 1)
+		{
+			paramsRestrict = { restrictionOperator4Tensor,
+							   elementToNodeTensor,
+							   restrictionMappingTensor,
+							   tempTensors[i - 1],
+							   rTensorOnLevelBelow};
 
-		const std::vector<Tensor> paramsInterpolate = { restrictionOperatorTensor,
-														elementToNodeTensor,
-														restrictionMappingTensor,
-														tempTensorOnLevelBelow,
-														tempTensors[i - 1]};
+			paramsInterpolate = { restrictionOperator4Tensor,
+								  elementToNodeTensor,
+								  restrictionMappingTensor,
+								  tempTensorOnLevelBelow,
+								  tempTensors[i - 1]};
+		}
+		else
+		{
+			paramsRestrict = { restrictionOperatorTensor,
+							   elementToNodeTensor,
+							   restrictionMappingTensor,
+							   tempTensors[i - 1],
+							   rTensorOnLevelBelow};
+
+			paramsInterpolate = { restrictionOperatorTensor,
+								  elementToNodeTensor,
+								  restrictionMappingTensor,
+								  tempTensorOnLevelBelow,
+								  tempTensors[i - 1]};
+		}
 
 		const std::vector<Tensor> paramsSmooth = { tempTensors[i - 1],
 													rTensors[i - 1],
@@ -251,8 +278,20 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 		const kp::Workgroup perElementOnLevelWorkgroup({(uint32_t)matrix.cols(), 1, 1});
 		const kp::Workgroup perDoFOnLevelWorkgroup({(uint32_t)systemMatrix.invDiagKOnLevels[i - 1].rows()/64 + 1, 1, 1});
 
-		Algorithm algoRestrict = mgr.algorithm(paramsRestrict, RestrictShader, perElementOnLevelWorkgroup);
-		Algorithm algoInterpolate = mgr.algorithm(paramsInterpolate, InterpolateShader, perElementOnLevelWorkgroup);
+		Algorithm algoRestrict;
+		Algorithm algoInterpolate;
+
+		if(i == 1 && systemMatrix.skipLevels == 1)
+		{
+			algoRestrict = mgr.algorithm(paramsRestrict, RestrictDoubleShader, perElementOnLevelWorkgroup);
+			algoInterpolate = mgr.algorithm(paramsInterpolate, InterpolateDoubleShader, perElementOnLevelWorkgroup);
+		}
+		else
+		{
+			algoRestrict = mgr.algorithm(paramsRestrict, RestrictShader, perElementOnLevelWorkgroup);
+			algoInterpolate = mgr.algorithm(paramsInterpolate, InterpolateShader, perElementOnLevelWorkgroup);
+		}
+
 		Algorithm algoSmooth = mgr.algorithm(paramsSmooth, SmoothShader, perDoFOnLevelWorkgroup);
 		Algorithm algoCWiseMult = mgr.algorithm(paramsCWiseMult, CWiseMultShader, perDoFOnLevelWorkgroup);
 		Algorithm algoPreSmoothAndAxpy = mgr.algorithm(paramsPreSmoothAndAxpy, PreSmoothAndAxpyShader, perDoFOnLevelWorkgroup);
@@ -279,7 +318,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(invDiagKOnLevelTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(rTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(tempTensors);
-	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor});
+	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor, restrictionOperator4Tensor});
 
 	uint64_t size = 0;
 	for( auto tensor : elementToNodeTensors)
@@ -328,6 +367,7 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	memoryUsage += size;
 
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
+	memoryUsage += restrictionOperator4Tensor->size()*sizeof(scalar);
 
 	const std::vector<Tensor> paramsFixedNodesZ = { tempTensors[0],
 											  fixedNodesTensor};
