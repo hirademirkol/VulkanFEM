@@ -22,22 +22,16 @@ int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 
     int* model = new int[sizeX*sizeY*sizeZ];
 
-    // for (int i = 0; i++; i < sizeX)
-    // {
-    //     for (int j = 0; j++; j < sizeY)
-    //     {
-    //         for (int k = 0; k++; k < sizeZ)
-    //         {
-    //             std::getline(myfile, line);
-
-    //         }
-    //     }
-    // }
-
-    int i = 0;
-    while(std::getline(myfile, line))
+    int element = 0;
+    for(int i = 0; i < sizeZ; i++)
     {
-        model[i++] = std::stoi(line);
+        for(int j = 0; j < sizeX*sizeY - 1; j++)
+        {
+            std::getline(myfile, line, ',');
+            model[element++] = std::stoi(line);
+        }
+        std::getline(myfile, line);
+        model[element++] = std::stoi(line);
     }
 
     myfile.close();
