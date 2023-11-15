@@ -67,12 +67,12 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	Tensor dotPTensor = mgr.tensor((void*)dotP, 1, sizeof(scalar), TensorDataTypes::eDouble, TensorTypes::eDevice);
 
 	memoryUsage += elementStiffnessTensor->size() * sizeof(scalar);
-	memoryUsage += elementToGlobalTensor->size() * sizeof(int); std::cout << "ElementToGlobalTensor: " << (float)(elementToGlobalTensor->size() * sizeof(int))/1024/1024 << std::endl;
-	memoryUsage += fixedNodesTensor->size() * sizeof(int); std::cout << "fixedNodesTensor: " << (float)(fixedNodesTensor->size() * sizeof(int))/1024/1024 << std::endl;
-	memoryUsage += pTensor->size() * sizeof(scalar); std::cout << "pTensor: " << (float)(pTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
-	memoryUsage += tempTensor->size() * sizeof(scalar); std::cout << "tempTensor: " << (float)(tempTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
-	memoryUsage += rTensor->size() * sizeof(scalar); std::cout << "rTensor: " << (float)(rTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
-	memoryUsage += uTensor->size() * sizeof(scalar); std::cout << "uTensor: " << (float)(uTensor->size() * sizeof(scalar))/1024/1024 << std::endl;
+	memoryUsage += elementToGlobalTensor->size() * sizeof(int);
+	memoryUsage += fixedNodesTensor->size() * sizeof(int);
+	memoryUsage += pTensor->size() * sizeof(scalar);
+	memoryUsage += tempTensor->size() * sizeof(scalar);
+	memoryUsage += rTensor->size() * sizeof(scalar);
+	memoryUsage += uTensor->size() * sizeof(scalar);
 	memoryUsage += norm1Tensor->size() * sizeof(scalar);
 	memoryUsage += norm2Tensor->size() * sizeof(scalar);
 	memoryUsage += dotPTensor->size() * sizeof(scalar);
@@ -325,51 +325,27 @@ void solveWithKompute(const MatrixFreeSparse<scalar>& systemMatrix, const std::v
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>(tempTensors);
 	mgr.sequence()->eval<kp::OpTensorSyncDevice>({restrictionOperatorTensor, restrictionOperator4Tensor});
 
-	uint64_t size = 0;
 	for( auto tensor : elementToNodeTensors)
-		size += tensor->size()*sizeof(int);
+		memoryUsage += tensor->size()*sizeof(int);
 
-	std::cout << "elementToNodeTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
-	size = 0;
 	for( auto tensor : restrictionMappingTensors)
-		size += tensor->size()*sizeof(int);
+		memoryUsage += tensor->size()*sizeof(int);
 
-	std::cout << "restrictionMappingTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
-	size = 0;
 	for( auto tensor : restrictionCoefficientTensors)
-		size += tensor->size()*sizeof(float);
+		memoryUsage += tensor->size()*sizeof(float);
 
-	std::cout << "restrictionCoefficientTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
-	size = 0;
 	for( auto tensor : invDiagKOnLevelTensors)
-		size += tensor->size()*sizeof(float);
+		memoryUsage += tensor->size()*sizeof(float);
 
-	std::cout << "invDiagKOnLevelTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
-	size = 0;
 	for( auto tensor : rTensors)
-		size += tensor->size()*sizeof(scalar);
+		memoryUsage += tensor->size()*sizeof(scalar);
 
-	size -= rTensor->size()*sizeof(scalar); // Double counted above
+	memoryUsage -= rTensor->size()*sizeof(scalar); // Double counted above
 
-	std::cout << "rTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
-
-	size = 0;
 	for( auto tensor : tempTensors)
-		size += tensor->size()*sizeof(scalar);
+		memoryUsage += tensor->size()*sizeof(scalar);
 
-	size -= tempTensor->size()*sizeof(scalar); // Double counted above
-
-	std::cout << "tempTensors: " << (float)size/1024/1024 << std::endl;
-	memoryUsage += size;
+	memoryUsage -= tempTensor->size()*sizeof(scalar); // Double counted above
 
 	memoryUsage += restrictionOperatorTensor->size()*sizeof(scalar);
 	memoryUsage += restrictionOperator4Tensor->size()*sizeof(scalar);
