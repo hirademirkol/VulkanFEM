@@ -41,12 +41,19 @@ int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 
 
 template <typename scalar>
-void getKe(scalar Ke[24][24])
+void getKe(std::string& model_name, scalar Ke[24][24])
 {
     std::string line;
     std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/Ke.txt";
+    std::filesystem::path file_path = "/" + model_name + "_Ke0.dat";
     path += file_path;
+
+    if(!std::filesystem::exists(path))
+    {
+        path = std::filesystem::current_path();
+        file_path = "/data/Ke0.dat";
+        path += file_path;
+    }
     
     std::ifstream myfile (path.string());
 
@@ -54,7 +61,7 @@ void getKe(scalar Ke[24][24])
     {
         for(int j = 0; j < 23; j++)
         {
-            std::getline(myfile, line, ' ');            
+            std::getline(myfile, line, ',');            
             Ke[i][j] = (scalar)std::stod(line);
         }   
         std::getline(myfile, line);
@@ -64,8 +71,8 @@ void getKe(scalar Ke[24][24])
     myfile.close();
 }
 
-template void getKe<double>(double Ke[24][24]);
-template void getKe<float>(float Ke[24][24]);
+template void getKe<double>(std::string& model_name, double Ke[24][24]);
+template void getKe<float>(std::string& model_name, float Ke[24][24]);
 
 template <typename scalar>
 void getBoundaryConditions(std::string& model_name, std::set<uint64_t>& fixedNodes, std::map<uint64_t, Vec3<scalar>>& loadedNodes)

@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
 	double Ke[24][24];
 	// ComputeKe(elementSize.x, elementSize.y, elementSize.z, 2e9, 0.394, Ke);
-	getKe(Ke);
+	getKe(modelName, Ke);
 
 	std::set<uint64_t> fixedNodes;
 	std::map<uint64_t, Vec3<real>> loadedNodes;
@@ -103,6 +103,12 @@ int main(int argc, char* argv[])
 #endif
 
 #endif
+	
+	double compliance = 0;
+	for(int i = 0; i < numDoF; i++)
+		compliance += f[i] * u[i];
+
+	std::cout << "Compliance:      " << compliance << std::endl;
 
 	delete voxelModel;
 
