@@ -4,8 +4,9 @@
 
 #define real double
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 64) in; // A usual workgroup size, shader must be dispatched with numDoF/64 workgroups
 
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer pBuffer { real p[]; };
 layout(binding = 1) buffer AtpBuffer { real Atp[]; };
 layout(binding = 2) buffer rBuffer { real r[]; };
@@ -15,6 +16,7 @@ layout(binding = 5) buffer dotPBuffer { real dotP; };
 
 void main()
 {
+    // First part of CG algorithm
     real alpha = norm2/dotP;
     u[index] += alpha * p[index];
     r[index] -= alpha * Atp[index];

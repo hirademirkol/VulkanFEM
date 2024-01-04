@@ -4,13 +4,15 @@
 
 #define real double
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 64) in; // A usual workgroup size, shader must be dispatched with numFixed/64 workgroups
 
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer xBuffer { real x[]; };
 layout(binding = 1) buffer fixedNodeBuffer { int fixedNodes[]; };
 
 void main()
 {
+    // Setting the fixed node components to 0
     x[3 * fixedNodes[index]    ] = 0;
     x[3 * fixedNodes[index] + 1] = 0;
     x[3 * fixedNodes[index] + 2] = 0;

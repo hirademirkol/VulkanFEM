@@ -3,6 +3,7 @@
 
 #include <vector>
 
+// Utility Vector (x,y,z) struct for basic coordinate operations
 template <typename scalar>
 struct Vec3
 {
@@ -80,6 +81,7 @@ Vec3i operator+(Vec3i first, Vec3i second);
 Vec3i operator-(Vec3i first, Vec3i second);
 bool operator<(Vec3i first, Vec3i second);
 
+// Linearization of 3-components into 1 for node ordering
 template <class T>
 inline T Linearize(const Vec3<T> &v, const Vec3<T> &size) { return v.x + v.y * size.x + v.z * (size.x * size.y); }
 
@@ -90,6 +92,7 @@ inline T Linearize(const Vec3<T> &v, const Vec3<T> &size) { return v.x + v.y * s
 
 namespace std
 {
+	// Hashing operator for finding unique coordinates
 	template <>
 	struct hash<Vec3i>
 	{

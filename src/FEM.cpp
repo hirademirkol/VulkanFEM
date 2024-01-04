@@ -15,15 +15,19 @@
 #include <execution>
 #include <numeric>
 
+// Assemble the system matrix from the elementToGlobal matrix and one element stiffness matrix
 template<typename scalar>
-inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<uint64_t, 8>>& elementToGlobal, double elementStiffness[24][24], scalar multiplier = 1.0)
+inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<uint64_t, 8>>& elementToGlobal, scalar elementStiffness[24][24], scalar multiplier = 1.0)
 {
 	Eigen::SparseMatrix<scalar> systemMatrix(size, size);
 	Vec3i node, node2;
 
 	std::vector<Eigen::Triplet<scalar>> triplets;
+
+	// Loop over each element
 	for(auto line : elementToGlobal)
 	{
+		// Loop over each set of two nodes on the element
 		FOR3(node, Vec3i(0), Vec3i(2))
 		{
 			FOR3(node2, Vec3i(0), Vec3i(2))
@@ -31,12 +35,15 @@ inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<ui
 				auto i = Linearize(node,  Vec3i(2));
 				auto j = Linearize(node2, Vec3i(2));
 
+				// Get the global node index
 				auto iGlobal = line[i];
 				auto jGlobal = line[j];
 
+				// Skip if the node is not used
 				if(iGlobal == -1 || jGlobal == -1)
 					continue;
 
+				// Add the row, column and the coefficient to the triplet list
 				for(int c1 = 0; c1 < 3; c1++)
 				{
 					for(int c2 = 0; c2 < 3; c2++)
@@ -48,20 +55,23 @@ inline Eigen::SparseMatrix<scalar> assembleK(int size, std::vector<std::array<ui
 		}
 	}
 
-	// saveMatrix(triplets, "K3");
-
+	// Create the sparse matrix from the triplets
 	systemMatrix.setFromTriplets(triplets.begin(), triplets.end());
 	systemMatrix.makeCompressed();
 
 	return systemMatrix;
 }
 
+// Create a list of used elements and nodes from the voxel model
 inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i nodeGridDimensions,
 							   std::vector<Vec3i>& usedElements, std::vector<int>& elementIndices, std::map<uint64_t, uint64_t>& usedNodes)
 {
 	Vec3i element; int index = 0;
+
+	// Loop over each element in the voxel model
 	FOR3(element,  Vec3i(0), voxelGridDimensions)
 	{
+		// Pick filled ones
 		if(voxelModel[Linearize(element, voxelGridDimensions)] == 1)
 		{
 			usedElements.push_back(element);
@@ -69,11 +79,13 @@ inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i
 		}
 	}
 
+	// MAX is set for Vec3's to use when being hashed, largest coordinate size is picked for MAX for unique hashes
 	Vec3i::MAX = std::max(nodeGridDimensions.x, nodeGridDimensions.y);
 	Vec3i::MAX = std::max(nodeGridDimensions.z, Vec3i::MAX);
 
 	Vec3i node;
 
+	// Loop over each corner of each element and create a unique set of used nodes' global indices
 	for(auto element : usedElements)
 	{
 		FOR3(node, Vec3i(0), Vec3i(2))
@@ -89,6 +101,7 @@ inline void EnlistUsedElements(int* voxelModel, Vec3i voxelGridDimensions, Vec3i
 
 #ifdef MULTIGRID
 
+// Calculate the inverse diagonal into a vector from element stiffness matrix and elementToNode array
 template <typename scalar>
 inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 4> elementToNode)
 {
@@ -97,6 +110,7 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 	const Eigen::Array<int, 1, 24> c   {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5};
 	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3};
 
+	// Add the contribution of each element to the diagonal
 	for (auto line : elementToNode.rowwise())
 	{	
 		Eigen::Array<int, 1, 24> xs = 3 * line(xInd) + c;
@@ -107,6 +121,7 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 	return invDiag;
 }
 
+// Calculate the inverse diagonal into a vector from unique element stiffness matrices and elementToNode array
 template <typename scalar>
 inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24> elementStiffnessMat, Eigen::Array<int, Eigen::Dynamic, 4> elementToNode, std::map<int, Eigen::Matrix<double, 24, 24>> uniqueElementStiffnessMatrices)
 {
@@ -116,6 +131,8 @@ inline Eigen::VectorXd GetInverseDiagonal(int size, Eigen::Matrix<scalar, 24, 24
 	const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3};
 
 	int index = 0;
+	
+	// Add the contribution of each element to the diagonal
 	for (auto line : elementToNode.rowwise())
 	{	
 		Eigen::Array<int, 1, 24> xs = 3 * line(xInd) + c;
@@ -159,6 +176,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 #ifdef MATRIX_FREE
 
+	// Each node is given an ordered index 1 to numIndices
 	uint64_t index = 0;
 	for (auto line : usedNodes)
 	{
@@ -169,6 +187,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	Eigen::Array<int, Eigen::Dynamic, 4> elementToGlobal(usedElements.size(), 4);
 
+	// elementToGlobal is filled with global index of each node in each element
 	std::for_each(std::execution::par_unseq, elementIndices.begin(), elementIndices.end(), [&](int index)
 	{
 		Vec3i node;
@@ -178,6 +197,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	});
 
+	// Element stiffness matrix is copied into an Eigen matrix
 	Eigen::Matrix<scalar, 24, 24> elementStiffnessMatrix;
 	for(int i = 0; i < 24; i++)
 	{
@@ -189,20 +209,22 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
+	// Fixed nodes are copied into an Eigen array
 	Eigen::ArrayXi fixed(fixedNodes.size());
-
 	index = 0;
 	for(auto val : fixedNodes)
 	{
 		fixed[index++] = (int)val;
 	}
+
+	// System matrix is created in matrix-free form
 	MatrixFreeSparse<scalar> systemMatrix(size, elementStiffnessMatrix, elementToGlobal, fixed);
 
 	#ifdef MULTIGRID
 
 	std::cout << "Preparing the Multigrid structure" << std::endl;
 
-
+	// Restriction operators are created from data
 	Eigen::Array<int, 8, 8> restrictionOnElement =  Eigen::Map<Eigen::Array<int, 8, 8>>(const_cast<int*>(restrictionOnElementValues.data()));
 	Eigen::Array<int, 64, 8> restrictionOnElement4 =  Eigen::Map<Eigen::Array<int, 8, 64>>(const_cast<int*>(restrictionOnElement4Values.data()), 8, 64).transpose();
 	Eigen::Matrix<double, 27, 8> restrictionOperator = Eigen::Map<Eigen::Matrix<double, 8, 27>>(const_cast<double*>(restrictionOperatorValues.data()), 8, 27).transpose();
@@ -210,7 +232,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 	Eigen::Matrix<double, 81, 24> restrictionOperatorDoF = Eigen::Map<Eigen::Matrix<double, 24, 81>>(const_cast<double*>(restrictionOperatorDoFValues.data()), 24, 81).transpose();
 	Eigen::Matrix<double, 375, 24> restrictionOperatorDoF4 = Eigen::Map<Eigen::Matrix<double, 24, 375>>(const_cast<double*>(restrictionOperatorDoF4Values.data()), 24, 375).transpose();
 
-	//Prepare multigrid related matrices
+	// Multigrid related matrix and arrays are prepared
 	std::vector<Vec3i> levelDims;
 	std::vector<std::vector<Vec3i>> levelElements;
 	std::vector<std::map<uint64_t, uint64_t>> usedNodesInLevels;
@@ -220,14 +242,17 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
   	std::vector<Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic>> restrictionMappings;
 	std::vector<Eigen::Matrix<scalar, Eigen::Dynamic, 1>> restrictionCoefficients;
 
+	// First level matrices are already created
 	levelDims.push_back(voxelGridDimensions);
 	levelElements.push_back(usedElements);
 	usedNodesInLevels.push_back(usedNodes);
 	fixedNodesInLevels.push_back(fixedNodes);
 	invDiagKOnLevels.push_back(GetInverseDiagonal(size, elementStiffnessMatrix, elementToGlobal));
 
+	// Loop over each Multigrid level
 	for(int i = 1; i < numLevels; i++)
 	{
+		// Calculation of new dimensions
 		Vec3i newLevelDims;
 		newLevelDims.x = levelDims[i-1].x / 2 + (levelDims[i-1].x % 2);
 		newLevelDims.y = levelDims[i-1].y / 2 + (levelDims[i-1].y % 2);
@@ -237,6 +262,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		std::set<Vec3i> elements, nodes;
 		std::map<Vec3i, std::vector<Vec3i>> coarseToFinerElementMap;
 
+		// Calculation of divisions, can be 4 in the case of level skipping
 		int divider = 2;
 		int numberOfChildren = 8;
 		if(i == 1 && skipLevels > 0)
@@ -245,6 +271,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			numberOfChildren = pow(divider, 3);
 		}
 
+		// Each fine element is mapped to coarse elements
 		for(auto finerElement: levelElements[i-1])
 		{
 			int x = finerElement.x / divider;
@@ -261,6 +288,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		std::map<Vec3i, Vec3i> coarseToFinerNodeMap;
 		std::map<int, Eigen::Matrix<double, 24, 24>> uniqueKsOnLevel;
 
+		// Each element is looped over and used nodes are listed, these nodes are also mapped to their corresponing finer nodes
 		for(auto element : elements)
 		{
 			uint64_t ind;
@@ -283,12 +311,14 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			}
 		}
 
+		// Each node is given an ordered index 1 to numIndices on level
 		index = 0;
 		for (auto line : usedNodesInLevel)
 		{
 			usedNodesInLevel[line.first] = index++;
 		}
 		
+		// Elements set is copied into a vector and a corresponding element index vector is created
 		std::vector<Vec3i> elementsVector(elements.size());
 		std::copy(elements.begin(), elements.end(), elementsVector.begin());
 		std::vector<int> levelElementIndices(elementsVector.size());
@@ -305,6 +335,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		std::mutex mapMutex;
 
+		// Parallelly, each element is used to be mapped to their nodes' global indices,
+		// Restriction coefficient and mapping is calculated depending on the weights of each finer node inside the element
 		std::for_each(std::execution::par_unseq, levelElementIndices.begin(), levelElementIndices.end(), [&](int index)
 		{
 			Vec3i node; int restrictionCoeff = 0;
@@ -329,6 +361,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 				}
 			}
 
+			// If a coarse element has non filled child (finer) elements, its unique element stiffness matrix is calculated
 			if(coarseToFinerElementMap[elementsVector[index]].size() < numberOfChildren)
 			{
 				Eigen::Matrix<scalar, Eigen::Dynamic, Eigen::Dynamic> tmpKfine = Eigen::Matrix<scalar, Eigen::Dynamic, Eigen::Dynamic>::Zero(3*pow(numBoundingNodesOnAxis, 3), 3*pow(numBoundingNodesOnAxis, 3));
@@ -337,6 +370,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 				const Eigen::Array<int, 1, 24> xInd{0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7};
 
 				Vec3i firstFinerElement = Vec3i(elementsVector[index].x * divider, elementsVector[index].y * divider, elementsVector[index].z * divider);
+
+				// Each element's contribution is added into a temporary K, as values from the global stiffness matrix on level
 				for(auto finerElement : coarseToFinerElementMap[elementsVector[index]])
 				{
 					Vec3i element = finerElement - firstFinerElement;
@@ -348,6 +383,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 						tmpKfine(3 * restrictionOnElement(elementIndex, xInd) + c, 3 * restrictionOnElement(elementIndex, xInd) + c) += pow(2, i - 1) * elementStiffnessMatrix;
 				}
 
+				// Temporary K is restricted to create the unique element stiffness matrix
 				Eigen::Matrix<scalar, 24, 24> K;
 				if(i == 1 && skipLevels == 1)
 					K = restrictionOperatorDoF4.transpose() * tmpKfine * restrictionOperatorDoF4;
@@ -363,7 +399,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		restrictionMappings.push_back(restrictionMapping);
 		restrictionCoefficients.push_back(restrictionCoeffVector.cwiseInverse());
 
-		//Find fixed nodes on the level
+		// The fixed nodes on the level above is written in an array
 		Eigen::ArrayXi fixedNodesAbove(fixedNodesInLevels[i-1].size());
 		index = 0;
 		for(auto val : fixedNodesInLevels[i-1])
@@ -373,11 +409,12 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 		Eigen::VectorXd fixingForcesAbove = Eigen::VectorXd::Zero(usedNodesInLevels[i-1].size() * 3);
 
+		// Fixing forces on level above are created as a vector of ones
 		fixingForcesAbove(3 * fixedNodesAbove    ) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
 		fixingForcesAbove(3 * fixedNodesAbove + 1) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
 		fixingForcesAbove(3 * fixedNodesAbove + 2) = Eigen::ArrayXd::Ones(fixedNodesAbove.size());
 
-		//Restrict fixing forces
+		// Fixing forces are restricted down to this level to pick the fixed nodes on the level
 		Eigen::Matrix<double, Eigen::Dynamic, 1> fixingForcesOnLevel = Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(usedNodesInLevel.size() * 3);
 		Eigen::Matrix<double, Eigen::Dynamic, 1> tempR = fixingForcesAbove.cwiseProduct(restrictionCoefficients[i - 1]);
 		
@@ -410,7 +447,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 			num++;
 		}
 
-		//Enlist fixed nodes on level
+		// The fixed nodes on this level are picked
 		std::set<uint64_t> fixedNodesOnLevel;
 
 		for(index = 0; index < fixingForcesOnLevel.rows(); index++)
@@ -422,6 +459,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 		fixedNodesInLevels.push_back(fixedNodesOnLevel);
 
+		// Inverse diagonal of the system matrix on the level is calculated
 		invDiagKOnLevels.push_back(GetInverseDiagonal<scalar>(levelSize, pow(2, i + skipLevels) * elementStiffnessMatrix, elementToGlobalOnLevel, uniqueKsOnLevel));
 
 		if(newLevelDims.x <= 2 || newLevelDims.y <= 2 || newLevelDims.z <= 2)
@@ -432,6 +470,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		}
 	}
 
+	// Free nodes and DoFs on the coarsest level are listed
 	std::map<uint64_t, uint64_t> freeNodes;
 	std::vector<uint64_t> freeIndices;
 	index = 1; 
@@ -456,6 +495,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		freeDoFsOnCoarsest[index++] = 3 * (int)val + 2;
 	}
 
+	// ElementToGlobal matrix for the coarsest level is created
 	int Ksize = freeNodes.size() * 3;
 	std::vector<std::array<uint64_t, 8>> elementToGlobalCoarsest;
 	for (auto element : levelElements[numLevels - 1])
@@ -469,13 +509,16 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToGlobalCoarsest.push_back(nodes);
 	}
 
+	// Explicit system matrix for the coarsest level is assembled
 	auto Kc = assembleK<scalar>(Ksize, elementToGlobalCoarsest, elementStiffness, pow(2, numLevels + skipLevels - 1));
 
+	// Multigrid related data is saved into the system
 	systemMatrix.PrepareMultigrid(numLevels, skipLevels, elementToNodeMatrices, restrictionMappings, restrictionCoefficients, invDiagKOnLevels, Kc, freeDoFsOnCoarsest);
 	#endif // MULTIGRID
 
 #else // MATRIX_FREE
 
+	// Free Nodes are enlisted for usage in the matrix solver
 	std::map<uint64_t, uint64_t> freeNodes;
 	uint64_t index = 1, expectedIndex = 0;
 	for (auto line : usedNodes)
@@ -490,6 +533,8 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 
 	Vec3i node;
 	std::vector<std::array<uint64_t, 8>> elementToGlobal;
+
+	// Each element is looped over and their free nodes' global indices are listed in the elementToGlobal matrix
 	for (auto element : usedElements)
 	{
 		std::array<uint64_t, 8> nodes;
@@ -500,7 +545,7 @@ Eigen::SparseMatrix<scalar> assembleSystemMatrix(int* voxelModel, Vec3i voxelGri
 		elementToGlobal.push_back(nodes);
 	}
 
-	auto systemMatrix = assembleK<scalar>(size, elementToGlobal, elementStiffness);
+	Eigen::SparseMatrix<scalar> systemMatrix = assembleK<scalar>(size, elementToGlobal, elementStiffness);
 
 	std::cout << "System Matrix : Size:" << systemMatrix.rows() << "x" << systemMatrix.cols() << ", Non-Zero:" << systemMatrix.nonZeros() << ", " << ((float)systemMatrix.nonZeros()/systemMatrix.rows()) << " full per row" << std::endl;
 #endif // MATRIX_FREE
@@ -523,11 +568,13 @@ template Eigen::SparseMatrix<float> assembleSystemMatrix<float>(int* voxelModel,
 template <typename scalar>
 void applyBoundaryConditions(std::vector<scalar>& f, std::map<uint64_t, Vec3<scalar>>& loadedNodes, const std::set<uint64_t>& fixedNodes)
 {
+	// Add each loading condition to the RHS vector
 	for(auto node : loadedNodes)
 	{
 #ifdef MATRIX_FREE
         uint64_t ind = node.first;
 #else
+		// For built matrix, fixed nodes are excluded. Here it is assumed that all fixed nodes removed are come before the loaded nodes
         uint64_t ind = node.first - fixedNodes.size();
 #endif
 		f[3*ind    ] = node.second.x;
@@ -547,11 +594,13 @@ template <typename scalar>
 void solveWithEigen(const Eigen::SparseMatrix<scalar>& A, const std::vector<scalar>& b, std::vector<scalar>& x)
 #endif
 {
+	// Data is copied into Eigen matrices
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> b_eig(b.size());
 	Eigen::Matrix<scalar, Eigen::Dynamic, 1> x_eig(x.size());
 
 	memcpy(b_eig.data(), b.data(), b.size()*sizeof(scalar)); 
 
+	// CG Solver is created with corresponding preconditioner and matrix form
 #ifdef MATRIX_FREE
 	#ifdef MULTIGRID
 	std::cout << "Setting up the CG solver with Matrix Free Formulation and Multigrid Preconditioner" << std::endl;

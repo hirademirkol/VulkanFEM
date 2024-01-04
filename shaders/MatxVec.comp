@@ -1,25 +1,27 @@
 #version 450
 
-#extension GL_EXT_shader_atomic_float: enable
+#extension GL_EXT_shader_atomic_float: enable // For atomicAdd
 
-#define indexElement gl_WorkGroupID.x
-#define indexX gl_LocalInvocationID.x
-#define indexY gl_LocalInvocationID.y
+#define indexElement gl_WorkGroupID.x // The shader must be dispatched per element
+#define indexX gl_LocalInvocationID.x // 1-8, see layout in below
+#define indexY gl_LocalInvocationID.y // 1-8, see layout in below
 
 #define real double
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-// The buffers are provided via the tensors
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer bufElementStiffness { real elementStiffness[24][24]; };
 layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][4]; };
 layout(binding = 2) buffer bufp { real p[]; };
 layout(binding = 3) buffer bufAtp { real Atp[]; };
 
 void main() {
+    // 4 of the 8 nodes are saved in the elementToGlobal matrix, each having implicitly +1 node with index: index+1
     const int dof1Index = elementToGlobal[indexElement][indexX / 2] + int(indexX) % 2;
     const int dof2Index = elementToGlobal[indexElement][indexY / 2] + int(indexY) % 2;
 
+    // Atomically adds A*p for the corresponding nodes of the element
     for(int i = 0; i < 3; i++)
     {
         for(int j = 0; j < 3; j++)

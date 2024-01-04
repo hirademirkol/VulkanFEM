@@ -5,6 +5,7 @@
 
 namespace Eigen 
 {
+  // Incomplete Cholesky Preconditioner implementation, based on the basic preconditioner implementations from Eigen
   template <typename scalar>
   class IncompleteCholeskyPreconditioner
   {
@@ -36,6 +37,7 @@ namespace Eigen
       template<typename MatType>
       IncompleteCholeskyPreconditioner& factorize(const MatType& mat)
       {
+        // Initialize the IncompleteCholesky solver from the matrix and write down the factorization matrix
         IncompleteCholesky<scalar> iChol(mat);
         m_LL = iChol.matrixL() * iChol.matrixL().transpose();
         m_LL.cwiseSqrt();
@@ -54,6 +56,7 @@ namespace Eigen
       template<typename Rhs, typename Dest>
       void _solve_impl(const Rhs& b, Dest& x) const
       {
+        // Return L*L'*b for preconditioning
         x = m_LL * b;
       }
 

@@ -4,8 +4,9 @@
 
 #define real double
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 64) in; // A usual workgroup size, shader must be dispatched with numDoF/64 workgroups
 
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer tempBuffer { real temp[]; };
 layout(binding = 1) buffer rBuffer { real r[]; };
 layout(binding = 2) buffer invDiagBuffer { float invDiag[]; };
@@ -13,5 +14,8 @@ layout(binding = 3) buffer restCoefBuffer { float restCoef[]; };
 
 void main()
 {
+    // Pre-Smoothing of the value by inverse diagonal of the matrix (Jacobi Smoothing)
+    // The smoothed values are directly added to the interpolated values since the residual is not smoothed
+    // This is done here to use less buffers for the operation
     temp[index] = temp[index] * restCoef[index] + r[index] * invDiag[index];
 }

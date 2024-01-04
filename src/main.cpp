@@ -6,16 +6,17 @@
 #include "in.hpp"
 #include "out.hpp"
 
-#include "Ke.h"
 #include "FEM.hpp"
 #include "FEMDefines.hpp"
 
+// Uncomment to use the CPU solver from Eigen
 // #define CPU
 
 #ifndef CPU
 
 #include "FEMGPU.hpp"
 
+// Only double precision is implemented for the GPU solver
 #define real double
 
 #else
@@ -27,7 +28,6 @@
 int main(int argc, char* argv[])
 {
 	Vec3i voxelModelSize; // Number of elements on each axis
-	Vec3d elementSize = Vec3d(1e-3); //m
 
 	if(argc < 2)
 	{
@@ -35,12 +35,13 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 	std::string fileName(argv[1]);
-	std::string modelName = fileName.substr(0, fileName.find('.', 1));
+	std::string modelName = fileName.substr(0, fileName.find('.', 1)); // Name of the file to be used for further operations, in path format
 
 	auto start = std::chrono::system_clock::now();
 	int* voxelModel = loadVoxel(modelName, voxelModelSize.x, voxelModelSize.y, voxelModelSize.z);
 
 #ifdef MULTIGRID
+	// Parse the necessary variables for Multigrid Preconditioner
 	int numLevels = 3;
 	int skipLevels = 0;
 	if(argc > 2)
@@ -56,17 +57,17 @@ int main(int argc, char* argv[])
 	std::cout << std::endl;
 #endif
 
-
+	// Get the element stiffness matrix and the boundary conditions from the files
 	double Ke[24][24];
-	// ComputeKe(elementSize.x, elementSize.y, elementSize.z, 2e9, 0.394, Ke);
 	getKe(modelName, Ke);
 
 	std::set<uint64_t> fixedNodes;
 	std::map<uint64_t, Vec3<real>> loadedNodes;
 	getBoundaryConditions(modelName, fixedNodes, loadedNodes);
 
+	// Assemble the system matrix according to the given configurations
 #ifndef MATRIX_FREE
-	SparseMatrix<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
+	Eigen::SparseMatrix<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
 #else
 	#ifndef MULTIGRID
 	MatrixFreeSparse<real> systemMatrix = assembleSystemMatrix<real>(voxelModel, voxelModelSize, Ke, fixedNodes);
@@ -79,7 +80,9 @@ int main(int argc, char* argv[])
 
 	std::cout << "System statistics:" << std::endl;
 	std::cout << "\tVoxel model resolution: " << voxelModelSize.x << " x " << voxelModelSize.y << " x " << voxelModelSize.z << std::endl;
+#ifdef MATRIX_FREE
 	std::cout << "\tElements: " << systemMatrix.elementToNode.rows() << std::endl;
+#endif // MATRIX_FREE
 	std::cout << "\tDegrees of freedom: " << numDoF << std::endl;
 
 	std::vector<real> f, u;
@@ -91,6 +94,8 @@ int main(int argc, char* argv[])
 	auto end = std::chrono::system_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	std::cout << "Preparation took:    " << (float)duration.count() / 1000 << " s" << std::endl;
+
+	// Solve the system with the defined solver
 #ifdef CPU
 	solveWithEigen<real>(systemMatrix, f, u);
 #else
@@ -104,14 +109,17 @@ int main(int argc, char* argv[])
 
 #endif
 	
+	// Calculate and print the compliance
 	double compliance = 0;
 	for(int i = 0; i < numDoF; i++)
 		compliance += f[i] * u[i];
 
 	std::cout << "Compliance:      " << compliance << std::endl;
 
-	delete voxelModel;
+	// Delete the voxel data
+	delete[] voxelModel;
 
+	// Save the solution
 	std::cout << "Saving the solution" << std::endl;
 	saveVector(u, modelName);
 

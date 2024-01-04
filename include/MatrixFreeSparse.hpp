@@ -3,6 +3,7 @@
 
 #include <Eigen/Sparse>
 
+// Declaration of Matrix-Free form matrix
 template <typename scalar>
 class MatrixFreeSparse;
 
@@ -13,7 +14,8 @@ class MatrixFreeSparse<double>;
 // class MatrixFreeSparse<float>;
 
 using Eigen::SparseMatrix;
- 
+
+// Inherit the traits of Sparse Matrix from Eigen for usage in solvers
 namespace Eigen {
 namespace internal {
   template<>
@@ -24,6 +26,8 @@ namespace internal {
   }
 }
 
+// Definition of Matrix-Free form matrix
+// Based on the example by Eigen: https://eigen.tuxfamily.org/dox/group__MatrixfreeSolverExample.html
 template<>
 class MatrixFreeSparse<double> : public Eigen::EigenBase<MatrixFreeSparse<double>> {
 public:
@@ -53,11 +57,13 @@ public:
   EIGEN_CONSTEXPR Index rows() const EIGEN_NOEXCEPT { return numElements; }
   EIGEN_CONSTEXPR Index cols() const EIGEN_NOEXCEPT { return numElements; }
 
+  //Necessary data for Matrix-free Solver
+  StorageIndex numElements;
   const Eigen::Matrix<double, 24, 24> elementStiffnessMat;
 	Eigen::Array<int, Eigen::Dynamic, 4> elementToNode;
   Eigen::ArrayXi fixedNodes;
 
-  //Necessary structs for Multigrid 
+  //Necessary data for Multigrid Preconditioner
   void PrepareMultigrid(int _numLevels,
                         int _skipLevels,
                         std::vector<Eigen::Array<int, Eigen::Dynamic, 4>> _elementToNodeMatrices,
@@ -85,8 +91,6 @@ public:
   std::vector<Eigen::VectorXd> invDiagKOnLevels;
   Eigen::SparseMatrix<double> Kc;
   Eigen::ArrayXi coarseFreeDoFs;
-  
-  StorageIndex numElements;
 };
 
 // template<>
@@ -179,6 +183,11 @@ namespace internal {
   //   };
   // };
 
+  // Implementation of a*A*b for iterative solvers,
+  // Where  a -> alpha (scalar),
+  //        A -> lhs (matrix),
+  // and    b -> rhs (vector).
+  // Based on the example by Eigen: https://eigen.tuxfamily.org/dox/group__MatrixfreeSolverExample.html
   template<typename Rhs>
   struct generic_product_impl<MatrixFreeSparse<double>, Rhs, SparseShape, DenseShape, GemvProduct> // GEMV stands for matrix-vector
   : generic_product_impl_base<MatrixFreeSparse<double>,Rhs,generic_product_impl<MatrixFreeSparse<double>,Rhs> >
@@ -191,12 +200,14 @@ namespace internal {
       const Array<int, 1, 24> c   {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5};
       const Array<int, 1, 24> xInd{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3};
 
+      // Loop over each element to add its contribution to the multiplication
       for(auto line : lhs.elementToNode.rowwise())
       {
         Array<int, 1, 24> xs = 3 * line(xInd) + c;
         dst(xs) += alpha * lhs.elementStiffnessMat * rhs(xs);
       }
 
+      // Zero the fixed nodes back
       dst(3 * lhs.fixedNodes    ) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
       dst(3 * lhs.fixedNodes + 1) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());
       dst(3 * lhs.fixedNodes + 2) = Eigen::ArrayXd::Zero(lhs.fixedNodes.size());

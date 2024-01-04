@@ -1,6 +1,8 @@
 #pragma once
 #include <array>
 
+// Data for the restriction operators and restriction index mappings
+
 const std::array<int, 64> restrictionOnElementValues =
 {
     0, 1, 3, 4, 9, 10, 12, 13,

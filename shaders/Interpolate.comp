@@ -1,16 +1,16 @@
 #version 450
 
-#extension GL_EXT_shader_atomic_float: enable
+#extension GL_EXT_shader_atomic_float: enable // For atomicAdd
 
-#define indexElement gl_WorkGroupID.x
-#define indexMapperNode gl_LocalInvocationID.x
-#define indexNode gl_LocalInvocationID.y
+#define indexElement gl_WorkGroupID.x // The shader must be dispatched per coarse element
+#define indexMapperNode gl_LocalInvocationID.x // 1-27, see layout in below
+#define indexNode gl_LocalInvocationID.y // 1-8, see layout in below
 
 #define real double
 
 layout (local_size_x = 27, local_size_y = 8, local_size_z = 1) in;
 
-// The buffers are provided via the tensors
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer bufrestrictionOperator { real restrictionOperator[27][8]; };
 layout(binding = 1) buffer bufelementToGlobal { int elementToGlobal[][4]; };
 layout(binding = 2) buffer bufrestrictionMapping { int restrictionMapping[][27]; };
@@ -18,11 +18,14 @@ layout(binding = 3) buffer buftempX { real tempX[]; };
 layout(binding = 4) buffer bufresult { real result[]; };
 
 void main() {
+    // 4 of the 8 nodes are saved in the elementToGlobal matrix, each having implicitly +1 node with index: index+1
     const int elementNode = elementToGlobal[indexElement][indexNode / 2] + int(indexNode) % 2;
     const int surroundingNode = restrictionMapping[indexElement][indexMapperNode];
-    
+
+    // Stop if the node should not be mapped to another node
     if (surroundingNode == -1) return;
 
+    // Map the value with interpolation operator to the finer grid and atomically add to the vector
     for(int i = 0; i < 3; i++)
     {
         atomicAdd(result[3 * surroundingNode + i], restrictionOperator[indexMapperNode][indexNode] * tempX[3 * elementNode + i]);

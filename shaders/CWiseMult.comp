@@ -4,13 +4,15 @@
 
 #define real double
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 64) in; // A usual workgroup size, shader must be dispatched with numDoF/64 workgroups
 
+// The buffers are provided via the tensors on C++ side
 layout(binding = 0) buffer x1Buffer { real x1[]; };
 layout(binding = 1) buffer x2Buffer { float x2[]; };
 layout(binding = 2) buffer resultBuffer { real result[]; };
 
 void main()
 {
+    // Component-wise multiplication of two vectors
     result[index] = x1[index] * x2[index];
 }

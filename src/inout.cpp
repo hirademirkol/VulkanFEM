@@ -3,7 +3,6 @@
 
 #pragma region input
 
-
 int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 {
     std::string line;
@@ -13,6 +12,7 @@ int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
     
     std::ifstream myfile (path.string());
 
+    // Read the dimensions first
     std::getline(myfile, line, ' ');
     sizeX = std::stoi(line);
     std::getline(myfile, line, ' ');
@@ -22,6 +22,7 @@ int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 
     int* model = new int[sizeX*sizeY*sizeZ];
 
+    // Read each element into the model
     int element = 0;
     for(int i = 0; i < sizeZ; i++)
     {
@@ -38,7 +39,6 @@ int* loadVoxel(std::string& model_name, int &sizeX, int &sizeY, int &sizeZ)
 
     return model;
 }
-
 
 template <typename scalar>
 void getKe(std::string& model_name, scalar Ke[24][24])
@@ -79,7 +79,7 @@ void getBoundaryConditions(std::string& model_name, std::set<uint64_t>& fixedNod
 {
     std::string line;
     
-    //fixing conditions
+    // Fixing conditions
     std::filesystem::path path = std::filesystem::current_path();
     std::filesystem::path file_path = "/" + model_name + "_fixed.dat";
     path += file_path;
@@ -97,7 +97,7 @@ void getBoundaryConditions(std::string& model_name, std::set<uint64_t>& fixedNod
 
     myfile.close();
 
-    //loading conditions
+    // Loading conditions
     path = std::filesystem::current_path();
     file_path = "/" + model_name + "_loading.dat";
     path += file_path;
@@ -134,6 +134,7 @@ template void getBoundaryConditions<float>(std::string& model_name, std::set<uin
 
 #pragma region output
 
+// Outputs the matrix in a formatted form to an output stream, not suitable for bigger matrices
 template <typename T>
 void outMatrix(std::vector<std::vector<T>> data, std::ostream &outStream)
 {
@@ -176,9 +177,6 @@ void outMatrix(std::vector<std::vector<T>> data, std::ostream &outStream)
 	outStream << "\t" << data[n-1][m-1] << " ⎦" << std::endl;
 }
 
-template void saveMatrix<double>(std::vector<std::vector<double>> data, std::string name);
-template void saveMatrix<float>(std::vector<std::vector<float>> data, std::string name);
-
 template <typename T>
 void saveMatrix(std::vector<std::vector<T>> data, std::string name)
 {
@@ -191,6 +189,15 @@ void saveMatrix(std::vector<std::vector<T>> data, std::string name)
 	outMatrix(data, myfile);
 
 	myfile.close();
+}
+
+template void saveMatrix<double>(std::vector<std::vector<double>> data, std::string name);
+template void saveMatrix<float>(std::vector<std::vector<float>> data, std::string name);
+
+template <typename T>
+void printMatrix(std::vector<std::vector<T>> data)
+{
+	outMatrix(data, std::cout);
 }
 
 template void printMatrix<double>(std::vector<std::vector<double>> data);
@@ -283,27 +290,8 @@ void saveArray(Eigen::Array<T, i, j> array, std::string name)
     myfile.close(); 
 }
 
+template void saveArray<int, -1, -1>(Eigen::Array<int, -1, -1> array, std::string name);
 template void saveArray<int, -1, 8>(Eigen::Array<int, -1, 8> array, std::string name);
 template void saveArray<int, -1, 27>(Eigen::Array<int, -1, 27> array, std::string name);
-
-template <typename T>
-void printMatrix(std::vector<std::vector<T>> data)
-{
-	outMatrix(data, std::cout);
-}
-
-template<typename T>
-void printModel(T* model, int numElements)
-{
-    std::filesystem::path path = std::filesystem::current_path();
-    std::filesystem::path file_path = "/data/out/result.bin";
-	path += file_path;
-    
-    std::ofstream myfile (path.string());
-	for(int i = 0; i < numElements; i++)
-		myfile << model[i] << std::endl;
-
-	myfile.close();
-}
 
 #pragma endregion output
