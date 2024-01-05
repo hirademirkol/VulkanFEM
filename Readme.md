@@ -1,6 +1,6 @@
 # Vulkan FEM Solver
 
-VulkanFEM is a FEM Solver implementation on the GPU using Vulkan. For the implementation of the GPU pipeline, [Kompute](https://github.com/KomputeProject/kompute/) is used. The problem created for solving is a basic Linear Elasticity Equation, where a voxel model is inputted to create FEM system and solve for displacement.
+VulkanFEM is a Finite Element Method Solver implementation on the GPU using Vulkan. For the implementation of the GPU pipeline, [Kompute](https://github.com/KomputeProject/kompute/) is used. The solver implements a Multigrid Preconditioned Conjugate Gradient Algorithm which also leverages the Matrix-Free formulation of a 3D domain. The problem created for solving is a basic Linear Elasticity Equation, where a voxel model is inputted to create the FEM system and solve for displacement.
 
 ## Dependencies
 
@@ -74,5 +74,6 @@ depending on the configurations selected.
 ## Additional Information
 
 - Data for the program can be found in [data](data) folder, where there is a sample data and additional zipped data.
+- To create data manually, the MATLAB Solver of [GMGS-3D](https://github.com/Junpeng-Wang-TUM/GMGS-3D) can be used and the data can be extracted with the [script](scripts/outputToC.m) provided.
 - The output of the program is saved to the data folder found in the build folder, same folder as the executable.
 - For different types of solver runs, definitions in [FEMDefines.hpp](include/FEMDefines.hpp) and [main.cpp](src/main.cpp) can be changed.
